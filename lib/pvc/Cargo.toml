@@ -1,0 +1,28 @@
+[package]
+name = "pvc"
+version = "2.2.0"
+authors = ["Patrick Marks <patrick@10xgenomics.com>"]
+
+[dependencies]
+serde = "*"
+serde_derive = "*"
+serde_json = "*"
+log = "*"
+fern = "*"
+docopt = "*"
+rust-htslib = "*" 
+regex = "*"
+ndarray = "0.6.0"
+csv = "1.0.0-beta.5"
+time = "*"
+bio = { git = "https://github.com/pmarks/rust-bio.git", rev = "4177cba483" }
+probability = "*"
+debruijn = { git = "https://github.com/10XGenomics/rust-debruijn.git" }
+backtrace = "*"
+itertools = "*"
+
+[dev-dependencies]
+simple_logger = "*"
+
+[profile.release]
+debug = true

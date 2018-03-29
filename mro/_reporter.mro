@@ -1,0 +1,114 @@
+# Copyright (c) 2014 10X Genomics, Inc. All rights reserved.
+#
+@include "_reporter_stages.mro"
+
+pipeline _REPORTER(
+    in  string sex,
+    in  bam    bcsorted_bam,
+    in  bam    possorted_bam,
+    in  string reference_path               "this is the reference_path",
+    in  bed    targets                      "this is the targets file",
+    in  bed    confident_regions            "confident genome regions",
+    in  string barcode_whitelist            "name of barcode set",
+    in  string restrict_locus,
+    in  int    vc_max_coverage,
+    in  json   lot_info,
+    in  map    coverage_rois,
+    in  h5     barcodes,
+    in  h5     fragments,
+    in  json   fragment_histogram,
+    in  json   single_partition_results,
+    in  json   barcode_histogram,
+    out h5     barcodes,
+    out h5     fragments,
+    out json   fragment_histogram,
+    out json   single_partition_results,
+    out json   barcode_histogram,
+    out json   basic_summary,
+    out h5     barcode_counts,
+    out h5     barcode_counts_mapped,
+    out json   insert_sizes,
+    out json   target_dists,
+    out json   mapq_counts,
+    out json   coverage_results,
+    out bed    high_coverage_excluded_bed,
+    out json   inferred_fragment_histogram,
+    out string sex,
+    out h5     coverage_details,
+    out h5     coverage_details_off_target,
+    out csv    coverage_csv,
+    out h5     target_coverage,
+    out tsv    barcode_blacklist,
+    out json   filter_barcodes_results,
+    out json   length_mass_results,
+    out json   lot_info,
+)
+{
+    call REPORT_BASIC(
+        input             = self.bcsorted_bam,
+        input_pos         = self.possorted_bam,
+        targets_file      = self.targets,
+        barcode_whitelist = self.barcode_whitelist,
+        lot_info          = self.lot_info,
+    )
+
+    call FILTER_BARCODES(
+        input     = self.bcsorted_bam,
+        barcodes  = self.barcodes,
+        fragments = self.fragments,
+    )
+
+    call REPORT_COVERAGE(
+        sex                     = self.sex,
+        input                   = self.possorted_bam,
+        reference_path          = self.reference_path,
+        high_coverage_threshold = self.vc_max_coverage,
+        targets_file            = self.targets,
+        confident_regions       = self.confident_regions,
+        fragments               = self.fragments,
+        restrict_locus          = self.restrict_locus,
+        regions_of_interest     = self.coverage_rois,
+    )
+
+    call REPORT_LENGTH_MASS(
+        reference_path    = self.reference_path,
+        targets_file      = self.targets,
+        barcodes          = self.barcodes,
+        fragments         = self.fragments,
+        barcode_whitelist = self.barcode_whitelist,
+    )
+
+    call COPY_FRAGMENT_INFO(
+        barcodes                 = self.barcodes,
+        fragments                = self.fragments,
+        fragment_histogram       = self.fragment_histogram,
+        barcode_histogram        = self.barcode_histogram,
+        single_partition_results = self.single_partition_results,
+    )
+
+    return (
+        barcodes                    = COPY_FRAGMENT_INFO.barcodes,
+        fragments                   = COPY_FRAGMENT_INFO.fragments,
+        fragment_histogram          = COPY_FRAGMENT_INFO.fragment_histogram,
+        barcode_histogram           = COPY_FRAGMENT_INFO.barcode_histogram,
+        single_partition_results    = COPY_FRAGMENT_INFO.single_partition_results,
+        basic_summary               = REPORT_BASIC.summary,
+        barcode_counts              = REPORT_BASIC.barcode_counts,
+        barcode_counts_mapped       = REPORT_BASIC.barcode_counts_mapped,
+        insert_sizes                = REPORT_BASIC.insert_sizes,
+        target_dists                = REPORT_BASIC.target_dists,
+        mapq_counts                 = REPORT_BASIC.mapq_counts,
+        coverage_results            = REPORT_COVERAGE.summary,
+        coverage_details            = REPORT_COVERAGE.coverage,
+        coverage_details_off_target = REPORT_COVERAGE.coverage_off_target,
+        coverage_csv                = REPORT_COVERAGE.coverage_csv,
+        sex                         = REPORT_COVERAGE.sex,
+        target_coverage             = REPORT_COVERAGE.target_coverage,
+        high_coverage_excluded_bed  = REPORT_COVERAGE.high_coverage_excluded_bed,
+        inferred_fragment_histogram = REPORT_LENGTH_MASS.inferred_length_distribution,
+        barcode_blacklist           = FILTER_BARCODES.barcode_blacklist,
+        filter_barcodes_results     = FILTER_BARCODES.filter_barcodes_results,
+        length_mass_results         = REPORT_LENGTH_MASS.summary,
+        lot_info                    = REPORT_BASIC.lot_info,
+    )
+}

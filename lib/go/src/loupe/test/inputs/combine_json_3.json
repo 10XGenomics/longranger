@@ -1,0 +1,6 @@
+{
+ "cookies": {"chocolate chip": "sugar"},
+ "numbers": [1,2,3,4,"five", 6.0],
+ "7": 8,
+ "deep": {"still deep": [ 1,2,3,{"even_depper": 6, "shallow": "no", "array": []}], "data": "yes"}
+}

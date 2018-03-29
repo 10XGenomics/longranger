@@ -1,0 +1,41 @@
+[package]
+name = "tada"
+version = "0.3.0"
+authors = [ "Patrick Marks <patrick@10xgenomics.com>" ]
+build = "build.rs"
+
+[dependencies]
+byteorder = "*"
+flate2 = "*"
+docopt = "*"
+bincode = "*"
+serde = "^1.0.11"
+serde_derive = "^1"
+serde_json = "*"
+bio = "*"
+rand = "*"
+time = "*"
+chrono = "*"
+itertools = "^0.6"
+log = "*"
+env_logger = "*"
+csv = "1.0.0-beta.3"
+rayon = "^0.8"
+libc = "*"
+tempfile = "*"
+nix = "*"
+backtrace = "*"
+rustc_version_runtime = "*"
+failure = "*"
+
+martian = { git = "https://github.com/martian-lang/martian-rust.git", rev="a7e2812" }
+debruijn = { git = "https://github.com/10XGenomics/rust-debruijn.git" }
+fastq_10x = { path = "external/rust-fastq-10x" }
+shardio = { path = "external/rust-shardio" }
+
+[dev-dependencies]
+quickcheck = "0.3"
+
+[profile.release]
+opt-level = 3
+debug = true

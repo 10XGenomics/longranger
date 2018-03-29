@@ -1,0 +1,191 @@
+#
+# Copyright (c) 2017 10X Genomics, Inc. All rights reserved.
+#
+filetype bam;
+filetype json;
+filetype bed;
+filetype bedpe;
+filetype txt;
+filetype csv;
+filetype tsv.gz;
+filetype h5;
+filetype tsv;
+filetype bedGraph;
+filetype vcf.gz;
+filetype vcf.gz.tbi;
+
+stage CONVERT_HDF5_TO_CSV(
+    in  h5  fragments_h5,
+    out csv fragments,
+    src py  "stages/cnv/convert_hdf5_to_csv",
+)
+
+stage GET_RPM(
+    in  csv      fragments,
+    in  tsv.gz   fragment_phasing,
+    in  bam      phased_possorted_bam,
+    in  bed      queryRegions,
+    in  bool     wgsmode,
+    in  int      mapq,
+    in  int      overlap,
+    out bed      rPM,
+    out string[] rPMFiles,
+    out txt      stat,
+    out txt      covStat,
+    out csv      fracPhased,
+    src py       "stages/cnv/get_rPM",
+) split using (
+    in  string   locus,
+)
+
+stage GET_RPM_HOM_DEL(
+    in  csv      fragments,
+    in  tsv.gz   fragment_phasing,
+    in  bam      phased_possorted_bam,
+    in  bed      queryRegions,
+    in  bool     wgsmode,
+    in  int      mapq,
+    in  int      overlap,
+    out csv      rPM,
+    out string[] rPMFiles,
+    out txt      stat,
+    out txt      covStat,
+    out csv      fracPhased,
+    src py       "stages/cnv/get_rPM",
+) split using (
+    in  string   locus,
+)
+
+stage CALL_CNV(
+    in  string[] rPMFiles,
+    in  int      maxUnknownGap,
+    in  int      maxNormalGap,
+    in  int      maxHomoGap,
+    in  bool     wgsmode,
+    out bed      het_del,
+    src py       "stages/cnv/call_cnv",
+) split using (
+    in  string   rPM,
+)
+
+stage MODIFY_BED_FILE(
+    in  bed   in_bed,
+    in  int   bin,
+    in  int[] nearTargetBin,
+    in  bool  addOffTarget,
+    out bed   modified,
+    src py    "stages/cnv/modify_bed_file",
+) split using (
+)
+
+stage MODIFY_BED_FILE_HOM_DEL(
+    in  bed   in_bed,
+    in  int   bin,
+    in  int[] nearTargetBin,
+    in  bool  addOffTarget,
+    out bed   modified,
+    src py    "stages/cnv/modify_bed_file",
+) split using (
+)
+
+stage ANALYZE_CNV(
+    in  bool wgsmode,
+    in  bed  het_del,
+    in  bed  het_del_truth_sensitivity,
+    in  bed  het_del_truth_ppv,
+    in  map  het_del_stratification,
+    in  map  blacklist_map,
+    in  bed  homo_del,
+    in  bed  homo_del_truth_sensitivity,
+    in  bed  homo_del_truth_ppv,
+    out json summary,
+    out bed  het_del_falsePositives,
+    out bed  het_del_falseNegatives,
+    out bed  homo_del_falsePositives,
+    out bed  homo_del_falseNegatives,
+    src py   "stages/cnv/analyze_cnv",
+)
+
+stage CALL_HOMO_DEL(
+    in  string[] rPMFiles,
+    in  int      minNumExons,
+    in  txt      covStat,
+    out bed      homo_del,
+    src py       "stages/cnv/call_homo_del",
+) split using (
+    in  string   rPM,
+)
+
+stage FILTER_HET_DEL(
+    in  bool  wgsmode,
+    in  bed   het_del,
+    in  float pvalFlt,
+    in  float WildCovFlt,
+    in  float BGImparityPvalFlt,
+    in  float BGBaseCovFlt,
+    in  float BGPhaseFracFlt,
+    in  map   blacklist_map,
+    out bed   het_del_filtered,
+    out bedpe het_del_filtered_bedpe,
+    src py    "stages/cnv/filter_het_del",
+)
+
+stage FILTER_HOMO_DEL(
+    in  bed        homo_del,
+    in  float      homo_pval_flt,
+    # number of contamination reads
+    in  float      homo_ctm_flt,
+    in  map        blacklist_map,
+    in  bedpe      het_del_filtered_bedpe,
+    in  string     reference_path,
+    in  string     sample_name,
+    out bed        homo_del_filtered,
+    out bedpe      homo_del_filtered_bedpe,
+    out bedpe      deletions,
+    out vcf.gz     deletions_vcf,
+    out vcf.gz.tbi deletions_vcf_index      "index"  "deletions_vcf.gz.tbi",
+    src py         "stages/cnv/filter_homo_del",
+)
+
+stage GET_COV_BEDGRAPH(
+    in  bam      bam_infile,
+    out bedGraph hp1,
+    out bedGraph hp2,
+    out bedGraph hp0,
+    out bedGraph zero_cov_hp1,
+    out bedGraph zero_cov_hp2,
+    out bedGraph anyzero,
+    out bedGraph homo,
+    out bed      het_del_regions,
+    src py       "stages/cnv/get_cov",
+) split using (
+    in  string   locus,
+)
+
+stage GENERATE_GROUND_TRUTH(
+    in  string reference_path,
+    in  bedpe  wgs_deletions_gt,
+    in  bool   wgsmode,
+    in  bed    target_regions,
+    in  int    min_overlap,
+    in  bed    low_coverage_blacklist,
+    in  map    blacklist_map,
+    out bed    het_gt_sen,
+    out bed    het_gt_ppv,
+    out bed    hom_gt_sen,
+    out bed    hom_gt_ppv,
+    out bed    het_del_query_region,
+    out bed    hom_del_query_region,
+    out map    blacklist_map,
+    src py     "stages/cnv/generate_exome_ground_truth",
+)
+
+stage COMPUTE_CUTOFFS(
+    in  json  length_mass,
+    in  float inferred_total_mass_ng,
+    out float het_del_pval_flt,
+    out float het_del_wildcov_flt,
+    out float homo_del_pval_flt,
+    out float homo_del_contamination_flt,
+    src py    "stages/cnv/compute_cutoffs",
+)

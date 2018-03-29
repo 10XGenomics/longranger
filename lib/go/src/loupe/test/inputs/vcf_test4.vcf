@@ -1,0 +1,17 @@
+1       30      .       C       T       10      .       X       GT:WW:WW:PS:WW:BX       0|1:.:.:3:5:AAA_4;ATA_6,GTGA_99
+1       31      .       C       T       10      .       X       GT:WW:WW:PS:WW:BX       0|1:.:.:3:5:AAA_4;ACC_9;ACG_09_44_54,TTT_88
+1       32      .       C       T       10      .       X       GT:WW:WW:PS:WW:BX       0|1:.:.:3:5:ACC_9,TTT_88
+1       33      .       C       T       10      .       X       GT:WW:WW:PS:WW:BX       0|1:.:.:3:5:AAA_12_55_54;ATA_65,ACG_09
+1       34      .       C       T       10      .       X       GT:WW:WW:PS:WW:BX       0|1:.:.:3:5:AATA_55_33_98;TTT_0;ACC_54,TTT_3;GCTA_88
+1       35      .       C       T       10      .       X       GT:WW:WW:PS:WW:BX       0/1:.:.:4:5:AAAAA_4;ATATAT_6,
+1       36      .       C       T       10      .       X       GT:WW:WW:PS:WW:BX       0/1:.:.:5:5:ACCAA_4;ATGGAT_6,
+1       37      .       C       T       10      .       X       GT:WW:WW:PS:WW:BX       0|1:.:.:6:5:CGC_1,
+1       38      .       C       T       10      .       X       GT:WW:WW:PS:WW:BX       0|1:.:.:6:5:CGC_1,TTT_43
+1       39      .       C       T       10      .       X       GT:WW:WW:PS:WW:BX       0|1:.:.:6:5:,TTT_77
+1       40      .       C       T       10      .       X       GT:WW:WW:PS:WW:BX       0/1:.:.:7:5:CGC_54;TTT_43,CGC_65;TTT_99
+2       31      .       C       T       10      .       X       GT:WW:WW:PS:WW:BX       0/1:.:.:7:5:CGC_54;TTT_43,CGC_65;TTT_99
+3       32      .       C       T       10      .       X       GT:WW:WW:PS:WW:BX       0/1:.:.:7:5:CGC_54;TTT_43,CGC_65;TTT_99
+11       33      .       C       T       10      .       X       GT:WW:WW:PS:WW:BX       0/1:.:.:7:5:CGC_54;TTT_43,CGC_65;TTT_99
+21       34      .       C       T       10      .       X       GT:WW:WW:PS:WW:BX       0/1:.:.:7:5:CGC_54;TTT_43,CGC_65;TTT_99
+X       36      .       C       T       10      .       X       GT:WW:WW:PS:WW:BX       0/1:.:.:7:5:CGC_54;TTT_43,CGC_65;TTT_99
+Y       30      .       C       T       10      .       X       GT:WW:WW:PS:WW:BX       0/1:.:.:7:5:CGC_54;TTT_43,CGC_65;TTT_99

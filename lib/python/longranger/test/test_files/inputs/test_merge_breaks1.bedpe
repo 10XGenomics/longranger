@@ -1,0 +1,4 @@
+#chrom1	start1	stop1	chrom2	start2	stop2	name	qual	strand1	strand2	filters	info
+chr1	1000	2000	chr2	1000	2000	A	10	+	+	.	NBCS1=3;NBCS2=2;NOV=1
+chr1	1100	2100	chr2	2500	3000	B	20	+	+	.	NBCS1=8;NBCS2=9;NOV=7
+chr1	1500	2500	chr3	1000	2000	C	10	+	+	.	NBCS1=5;NBCS2=4;NOV=1

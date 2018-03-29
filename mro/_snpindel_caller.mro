@@ -1,0 +1,42 @@
+#
+# Copyright (c) 2014 10X Genomics, Inc. All rights reserved.
+#
+@include "_snpindel_caller_stages.mro"
+
+pipeline _SNPINDEL_CALLER(
+    in  string restrict_locus              "locus to restrict variant-calling to",
+    in  bam    input                       "duplicate-marked, sorted aligned bam file",
+    in  string reference_path              "name of the reference",
+    in  string vc_precalled,
+    in  string mode                        "'freebayes' or 'gatk'",
+    in  int    min_mapq_attach_bc,
+    in  bed    high_coverage_excluded_bed,
+    out vcf.gz variants                    "results file",
+)
+{
+    call CALL_SNPINDELS(
+        targets_file               = null,
+        high_coverage_excluded_bed = self.high_coverage_excluded_bed,
+        vc_precalled               = self.vc_precalled,
+        variant_mode               = self.mode,
+        restrict_locus             = self.restrict_locus,
+        input                      = self.input,
+        reference_path             = self.reference_path,
+    )
+
+    call POPULATE_INFO_FIELDS(
+        vc_precalled       = CALL_SNPINDELS.precalled,
+        variant_mode       = self.mode,
+        haploid_merge      = null,
+        chunk_locus        = null,
+        reference_path     = self.reference_path,
+        input              = CALL_SNPINDELS,
+        bam                = self.input,
+        min_mapq_attach_bc = self.min_mapq_attach_bc,
+        default_indel_qual = 43,
+    )
+
+    return (
+        variants = POPULATE_INFO_FIELDS,
+    )
+}

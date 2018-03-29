@@ -1,0 +1,89 @@
+#
+# Copyright (c) 2015 10X Genomics, Inc. All rights reserved.
+#
+filetype fastq;
+filetype bam;
+filetype bam.bai;
+filetype bed;
+filetype json;
+filetype txt;
+filetype fastq.gz;
+filetype h5;
+
+stage COUNT_BCS(
+    in  string barcode_whitelist,
+    in  map[]  chunks,
+    out json   bc_counts,
+    src py     "stages/reads/count_bcs",
+) split using (
+    in  map    chunk,
+)
+
+stage ALIGN(
+    in  map[]  chunks,
+    in  string aligner,
+    in  string aligner_method,
+    in  string reference_path,
+    in  int    num_threads,
+    out bam,
+    src py     "stages/reads/align_reads",
+) split using (
+    in  map    chunk,
+)
+
+stage ATTACH_BCS(
+    in  string barcode_whitelist,
+    in  bam    align,
+    in  map[]  chunks,
+    in  bool   paired_end,
+    in  bool   exclude_non_bc_reads,
+    in  float  bc_confidence_threshold,
+    in  json   bc_counts,
+    out bam    output,
+    out int    perfect_read_count,
+    src py     "stages/reads/attach_bcs",
+) split using (
+    in  bam    align_chunk,
+    in  map    chunk,
+)
+
+stage SORT_BY_POS(
+    in  bam input,
+    out bam,
+    out int perfect_read_count,
+    src py  "stages/reads/sort_reads",
+) split using (
+    in  bam chunk_input,
+)
+
+stage MARK_DUPLICATES(
+    in  bam     input,
+    in  int     perfect_read_count,
+    in  bed     targets_file,
+    in  bool    write_bam,
+    out bam     output,
+    out bam.bai index,
+    out json    duplicate_summary,
+    src py      "stages/reads/mark_duplicates",
+) split using (
+    in  float   estimated_coverage,
+    in  map     lane_map,
+    in  string  chunk_start,
+    in  string  chunk_end,
+)
+
+stage REPORT_SINGLE_PARTITION(
+    in  bam    input,
+    in  string barcode_whitelist,
+    in  bed    targets_file,
+    in  json   barcode_count,
+    in  int    read_link_distance,
+    out json   single_partition,
+    out json   fragment_size,
+    out h5     fragments,
+    out h5     barcodes,
+    out json   barcode_histogram,
+    src py     "stages/reporter/report_single_partition",
+) split using (
+    in  int    tid,
+)

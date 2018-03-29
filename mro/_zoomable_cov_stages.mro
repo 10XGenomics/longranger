@@ -1,0 +1,23 @@
+#
+## Copyright (c) 2017 10X Genomics, Inc. All rights reserved.
+##
+filetype bam;
+filetype h5;
+filetype tsv.gz;
+filetype bw;
+
+stage GET_COV_BEDGRAPH_WITH_ZOOM(
+    in  bam    possorted_bam,
+    in  tsv.gz fragment_phasing,
+    out bw     hp_read_1,
+    out bw     hp_read_2,
+    out bw     hp_read_0,
+    out bw     hp_read_t,
+    out bw     hp_bc_1,
+    out bw     hp_bc_2,
+    out bw     hp_bc_0,
+    out bw     hp_bc_t,
+    src py     "stages/cnv/get_zoomable_cov",
+) split using (
+    in  string locus,
+)

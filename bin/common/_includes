@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2016 10x Genomics, Inc. All rights reserved.
+#
+# Long Ranger common docopt strings and options processing functions.
+#
+
+source $TENX_SCRIPTDIR/../tenkit/bin/common/_includes
+
+read -d '' DOCOPT_OPTIONS_SAMPLE_INFO <<EOF
+    --description=TEXT  Sample description to embed in output files. Optional.
+    --library=TEXT      Sequencing library name to embed in BAM files.
+                            Optional. Must not contain tabs or newlines.
+EOF
+
+read -d '' DOCOPT_OPTIONS_REFERENCE <<EOF
+    --reference=PATH    Path of folder containing 10X-compatible reference. Required.
+EOF
+
+read -d '' DOCOPT_OPTIONS_VARIANT_CALLING <<EOF
+    --vcmode=MODE       Variant calling mode: 'freebayes'
+                            or 'gatk:/path/to/GenomeAnalysisTK.jar',
+                            or 'disable' (phase only). Required.
+    --somatic           Use the somatic-optimized large-scale SV caller.
+                            Preferred for tumor and high-variance samples.
+    --precalled=PATH    Path to pre-called VCF file to be phased. Implies --vcmode=disable. Optional. 
+    --sex=SEX           Sex of sample: m, f, male or female. 
+                            Optional. Will try to auto-detect sex if not set.
+EOF
+
+read -d '' DOCOPT_OPTIONS_TARGETED <<EOF
+    --targets=PATH      Path to BED file for pulldown targets. Required.
+    --cnvfilter=PATH    Path to BED file of targets to ignore in CNV calling.
+EOF
+
+read -d '' DOCOPT_OPTIONS_OTHER <<EOF
+    --downsample=GB     Downsample input FASTQs to at most GB gigabases of
+                            input sequence. Optional.
+    --noloupe           Run pipeline without generating .loupe file.
+EOF
+
+function process_options_reference {
+    # --reference
+    if [ -n "$reference" ]; then
+        reference_path=\"$(abspath $reference)\"
+    elif [ -n "$TENX_REFDATA" ]; then
+        reference_path=\"$(abspath $TENX_REFDATA)\"
+    else
+    	# reference_path=\"\"
+	error "You must specify the --reference argument"
+    fi    
+}
+
+function process_options_longranger {
+    if [ -n "$downsample" ]; then
+        downsample="{ \"gigabases\": $downsample }"
+    else
+        downsample=null
+    fi
+
+    # --description
+    if [ -n "$description" ]; then
+        sample_desc=\"$description\"
+    else
+        sample_desc=\"\"
+    fi
+
+    # --precalled
+    if [ -n "$precalled" ]; then
+        vc_precalled=\"$precalled\"
+    else
+        vc_precalled=null
+    fi
+
+    # --vcmode
+    if [ -n "$vcmode" ]; then
+        vc_mode=\"$vcmode\"
+    else
+        if [ -n "$precalled" ]; then
+            vc_mode=\"disable\"
+        else
+            error "Please specify the --vcmode argument to select a variant caller. Note 10x recommends using GATK, which must be supplied externally. Please see https://support.10xgenomics.com/genome-exome/software/pipelines/latest/advanced/gatk for details." 
+            #vc_mode=\"freebayes\"
+        fi
+    fi
+
+    # --somatic (reverse polarity)
+    if [ "$somatic" == "true" ]; then
+        is_germline=false
+    else
+        is_germline=true
+    fi
+
+    # --sex
+    if [ -n "$sex" ]; then
+        sex=\"$sex\"
+    else
+        sex=null
+    fi
+
+    # --noloupe
+    # docopt already generates true or false    
+}

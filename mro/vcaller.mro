@@ -1,0 +1,194 @@
+#
+# Copyright (c) 2014 10X Genomics, Inc. All rights reserved.
+#
+@include "_aligner.mro"
+@include "_preflight_stages.mro"
+@include "_reporter.mro"
+@include "_snpindel_phaser.mro"
+@include "_util_stages.mro"
+
+pipeline VCALLER(
+    in  string     fastq_mode                "FASTQ input mode",
+    in  string     sample_id                 "sample ID",
+    in  map[]      sample_def,
+    in  string     reference_path,
+    in  bed        targets,
+    in  map        cov_regions_of_interest,
+    in  map        vc_regions_of_interest,
+    in  string     restrict_locus            "locus to restrict phasing to",
+    in  bool       exclude_non_bc_reads,
+    in  bed        confident_regions         "confident genome regions",
+    in  int        trim_length,
+    in  string     barcode_whitelist         "name of barcode set",
+    in  string     vc_mode                   "'freebayes' or 'gatk:/path/to/GenomeAnalysisTK.jar'",
+    in  vcf        vc_ground_truth,
+    in  int        max_coverage,
+    out bam        possorted_bam,
+    out bam.bai    possorted_bam_index,
+    out vcf.gz     variants,
+    out vcf.gz.tbi variants_index,
+    out json       duplicate_summary,
+    out json       basic_summary,
+    out h5         barcode_counts,
+    out json       insert_sizes,
+    out json       target_dists,
+    out json       mapq_counts,
+    out json       coverage_results,
+    out h5         coverage_details,
+    out json       single_partition_results,
+    out json       length_mass_results,
+    out h5         fragments,
+    out json       summary,
+    out csv        summary_cs,
+    out json       lot_info,
+    out json       downsample_info,
+)
+{
+    call local preflight PHASER_SVCALLER_PREFLIGHT_LOCAL(
+        sample_id         = self.sample_id,
+        sample_def        = self.sample_def,
+        # Hardcoded to male -- sex not used in VCALLER
+        sex               = "male",
+        targets           = self.targets,
+        target_blacklist  = null,
+        restrict_locus    = self.restrict_locus,
+        vc_precalled      = null,
+        vc_mode           = self.vc_mode,
+        reference_path    = self.reference_path,
+        vc_ground_truth   = self.vc_ground_truth,
+        sv_min_qv         = null,
+        sv_ground_truth   = null,
+        check_executables = false,
+    )
+
+    call preflight PHASER_SVCALLER_PREFLIGHT(
+        sample_id         = self.sample_id,
+        sample_def        = self.sample_def,
+        # Hardcoded to male -- sex not used in VCALLER
+        sex               = "male",
+        targets           = self.targets,
+        target_blacklist  = null,
+        restrict_locus    = self.restrict_locus,
+        vc_precalled      = null,
+        vc_mode           = self.vc_mode,
+        reference_path    = self.reference_path,
+        vc_ground_truth   = self.vc_ground_truth,
+        sv_min_qv         = null,
+        sv_ground_truth   = null,
+        check_executables = true,
+    )
+
+    call _ALIGNER(
+        sample_id            = self.sample_id,
+        fastq_mode           = self.fastq_mode,
+        sample_def           = self.sample_def,
+        reference_path       = self.reference_path,
+        targets              = self.targets,
+        exclude_non_bc_reads = self.exclude_non_bc_reads,
+        trim_length          = self.trim_length,
+        barcode_whitelist    = self.barcode_whitelist,
+        downsample           = null,
+    )
+
+    call _REPORTER(
+        # Hardcoded to male -- sex not used in VCALLER
+        sex                      = "male",
+        vc_max_coverage          = self.max_coverage,
+        bcsorted_bam             = _ALIGNER.bcsorted_bam,
+        possorted_bam            = _ALIGNER.possorted_bam,
+        reference_path           = self.reference_path,
+        targets                  = self.targets,
+        confident_regions        = self.confident_regions,
+        barcode_whitelist        = self.barcode_whitelist,
+        restrict_locus           = self.restrict_locus,
+        lot_info                 = _ALIGNER.lot_info,
+        coverage_rois            = self.cov_regions_of_interest,
+        barcodes                 = _ALIGNER.barcodes,
+        fragments                = _ALIGNER.fragments,
+        fragment_histogram       = _ALIGNER.fragment_histogram,
+        barcode_histogram        = _ALIGNER.barcode_histogram,
+        single_partition_results = _ALIGNER.single_partition_results,
+    )
+
+    call _SNPINDEL_CALLER(
+        vc_precalled               = null,
+        high_coverage_excluded_bed = _REPORTER.high_coverage_excluded_bed,
+        mode                       = self.vc_mode,
+        restrict_locus             = self.restrict_locus,
+        input                      = _ALIGNER.possorted_bam,
+        reference_path             = self.reference_path,
+        min_mapq_attach_bc         = 30,
+    )
+
+    call SORT_GROUND_TRUTH(
+        input = self.vc_ground_truth,
+    )
+
+    call ANALYZE_SNPINDEL_CALLS(
+        vc_precalled                 = null,
+        variant_mode                 = self.vc_mode,
+        bam_file                     = _ALIGNER.possorted_bam,
+        ground_truth                 = SORT_GROUND_TRUTH,
+        validation_bam               = null,
+        comparison_vcf               = null,
+        p1_genes_list                = null,
+        input                        = _SNPINDEL_CALLER.variants,
+        coverage                     = _REPORTER.coverage_details,
+        reference_path               = self.reference_path,
+        targets_file                 = self.targets,
+        regions_of_interest          = self.vc_regions_of_interest,
+        restrict_locus               = self.restrict_locus,
+        fragment_phasing             = null,
+        long_switch_penalty_multiple = 5,
+    )
+
+    call COPY_BAM(
+        input       = _ALIGNER.possorted_bam,
+        input_index = _ALIGNER.possorted_bam_index,
+    )
+
+    call SUMMARIZE_REPORTS(
+        sample_id                = self.sample_id,
+        reference_path           = self.reference_path,
+        targets                  = self.targets,
+        trim_length              = self.trim_length,
+        duplicate_summary        = _ALIGNER.duplicate_summary,
+        basic_results            = _REPORTER.basic_summary,
+        barcode_counts           = _REPORTER.barcode_counts,
+        filter_barcodes_results  = _REPORTER.filter_barcodes_results,
+        coverage_results         = _REPORTER.coverage_results,
+        coverage_details         = _REPORTER.coverage_details,
+        variant_results          = ANALYZE_SNPINDEL_CALLS.summary,
+        sv_results               = null,
+        sv_min_call_qv_wgs       = 0,
+        sv_min_call_qv_target    = 0,
+        short_del_results        = null,
+        single_partition_results = _ALIGNER.single_partition_results,
+        length_mass_results      = _REPORTER.length_mass_results,
+        bam_file                 = COPY_BAM.possorted_bam,
+        lot_info                 = _REPORTER.lot_info,
+        downsample_info          = _ALIGNER.downsample_info,
+    )
+
+    return (
+        duplicate_summary        = _ALIGNER.duplicate_summary,
+        possorted_bam            = COPY_BAM.possorted_bam,
+        possorted_bam_index      = COPY_BAM.possorted_bam_index,
+        variants                 = ANALYZE_SNPINDEL_CALLS.varcalls,
+        variants_index           = ANALYZE_SNPINDEL_CALLS.varcalls_index,
+        basic_summary            = _REPORTER.basic_summary,
+        barcode_counts           = _ALIGNER.barcodes,
+        insert_sizes             = _REPORTER.insert_sizes,
+        target_dists             = _REPORTER.target_dists,
+        mapq_counts              = _REPORTER.mapq_counts,
+        coverage_results         = _REPORTER.coverage_results,
+        coverage_details         = _REPORTER.coverage_details,
+        single_partition_results = _ALIGNER.single_partition_results,
+        length_mass_results      = _REPORTER.length_mass_results,
+        fragments                = _ALIGNER.fragments,
+        summary                  = SUMMARIZE_REPORTS.summary,
+        summary_cs               = SUMMARIZE_REPORTS.summary_cs,
+        lot_info                 = _REPORTER.lot_info,
+        downsample_info          = _ALIGNER.downsample_info,
+    )
+}

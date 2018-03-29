@@ -1,0 +1,33 @@
+#
+# Copyright (c) 2015 10X Genomics, Inc. All rights reserved.
+#
+@include "basic.mro"
+
+pipeline BASIC_CS(
+    in  string   fastq_mode          "input fastq mode: ILMN_BCL2FASTQ or BCL_PROCESSOR",
+    in  string   sample_id           "user-supplied sample ID",
+    in  map[]    sample_def          "multiplexed sample definition",
+    in  string   output_format       "output format: bam or fastq",
+    in  string   read_group          "user-supplied read group for BAM header",
+    out csv      summary             "Run summary",
+    out fastq.gz barcoded            "FASTQ barcoded",
+    out bam      barcoded_unaligned  "BAM barcoded, unaligned",
+)
+{
+    call BASIC(
+        fastq_mode        = self.fastq_mode,
+        sample_id         = self.sample_id,
+        sample_def        = self.sample_def,
+        downsample        = null,
+        output_format     = self.output_format,
+        read_group        = self.read_group,
+        trim_length       = 7,
+        barcode_whitelist = "4M-with-alts-february-2016",
+    )
+
+    return (
+        summary            = BASIC.summary_cs,
+        barcoded           = BASIC.barcoded,
+        barcoded_unaligned = BASIC.barcoded_unaligned,
+    )
+}

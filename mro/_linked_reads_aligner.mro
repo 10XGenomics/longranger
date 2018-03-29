@@ -1,0 +1,103 @@
+#
+# Copyright (c) 2015 10X Genomics, Inc. All rights reserved.
+#
+@include "_aligner_stages.mro"
+@include "_linked_reads_aligner_stages.mro"
+@include "_fastq_prep_new.mro"
+
+pipeline _LINKED_READS_ALIGNER(
+    in  string  fastq_mode                     "configuration of the input fastqs",
+    in  map[]   sample_def,
+    in  string  barcode_whitelist              "name of barcode whitelist file",
+    in  int     trim_length,
+    in  string  sample_id,
+    in  map     downsample,
+    in  bool    exclude_non_bc_reads,
+    in  string  reference_path,
+    in  bed     targets,
+    in  int     bc_max_error_allowed           "maximum number of error corrections allowed for each barcode",
+    in  float   bc_pseudo_count                "pseudo count for the barcode count",
+    in  bool    bc_use_mapping                 "whether mapping information will be used for barcode error correction",
+    in  int     bc_mapq                        "the mapq threshold beyond which the mapping information may be used for barcode error correction",
+    in  bool    bc_allow_indel                 "whether indels are allowed in barcode correction",
+    in  bool    frag_no_merging                "whether to merge fragments based on the possible assumption of big deletions that separate an original fragment into two",
+    in  int     frag_mapq                      "mapq threshold beyond which the read can serve as the ends of fragments",
+    in  float   frag_pval                      "p-value below which two nearby fragments are thought as one original fragment separated by a big deletion",
+    in  int     frag_freq                      "number of overlapping barcodes beyond which two nearby fragments are thought as one original fragment separated by a big deletion",
+    in  int     frag_min_num_reads_off_target  "number of reads an off-target fragment carries in order to be kept in the output fragments.h5 file",
+    out bam     possorted_bam,
+    out bam     bcsorted_bam,
+    out bam.bai possorted_bam_index,
+    out json    duplicate_summary,
+    out json    lot_info,
+    out rsd     barcode_count,
+    out json    downsample_info,
+    out json    single_partition_results,
+    out json    fragment_histogram,
+    out json    barcode_histogram,
+    out h5      fragments,
+    out h5      barcodes,
+)
+{
+    call _FASTQ_PREP_NEW(
+        sample_id         = self.sample_id,
+        downsample        = self.downsample,
+        fastq_mode        = self.fastq_mode,
+        sample_def        = self.sample_def,
+        barcode_whitelist = self.barcode_whitelist,
+        trim_length       = 0,
+    )
+
+    call volatile BARCODE_AWARE_ALIGNER(
+        trim_length          = self.trim_length,
+        sample_id            = self.sample_id,
+        read_groups          = _FASTQ_PREP_NEW.read_groups,
+        reads                = _FASTQ_PREP_NEW.reads,
+        reference_path       = self.reference_path,
+        exclude_non_bc_reads = self.exclude_non_bc_reads,
+    )
+
+    call volatile MERGE_BC_BAM(
+        bc_sorted_bams = BARCODE_AWARE_ALIGNER.bc_sorted_bam,
+    )
+
+    call volatile MERGE_POS_BAM(
+        position_chunks               = BARCODE_AWARE_ALIGNER.position_chunks,
+        reference_path                = self.reference_path,
+        barcode_whitelist             = self.barcode_whitelist,
+        barcode_count                 = _FASTQ_PREP_NEW.bc_counts,
+        targets_file                  = self.targets,
+        bc_max_error_allowed          = self.bc_max_error_allowed,
+        bc_pseudo_count               = self.bc_pseudo_count,
+        bc_use_mapping                = self.bc_use_mapping,
+        bc_mapq                       = self.bc_mapq,
+        bc_allow_indel                = self.bc_allow_indel,
+        frag_no_merging               = self.frag_no_merging,
+        frag_mapq                     = self.frag_mapq,
+        frag_pval                     = self.frag_pval,
+        frag_freq                     = self.frag_freq,
+        frag_min_num_reads_off_target = self.frag_min_num_reads_off_target,
+    )
+
+    call volatile MARK_DUPLICATES(
+        targets_file       = self.targets,
+        perfect_read_count = 1,
+        input              = MERGE_POS_BAM.pos_sorted_bam,
+        write_bam          = false,
+    )
+
+    return (
+        bcsorted_bam             = MERGE_BC_BAM.bc_sorted_bam,
+        possorted_bam            = MERGE_POS_BAM.pos_sorted_bam,
+        possorted_bam_index      = MERGE_POS_BAM.pos_sorted_bam_index,
+        duplicate_summary        = MARK_DUPLICATES.duplicate_summary,
+        lot_info                 = _FASTQ_PREP_NEW.lot_info,
+        downsample_info          = _FASTQ_PREP_NEW.downsample_info,
+        barcode_count            = _FASTQ_PREP_NEW.bc_counts,
+        single_partition_results = MERGE_POS_BAM.single_partition,
+        fragment_histogram       = MERGE_POS_BAM.fragment_size,
+        barcode_histogram        = MERGE_POS_BAM.barcode_histogram,
+        fragments                = MERGE_POS_BAM.fragments,
+        barcodes                 = MERGE_POS_BAM.barcodes,
+    )
+}

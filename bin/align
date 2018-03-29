@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2016 10x Genomics, Inc. All rights reserved.
+#
+# Run ALIGNER_CS with mrp.
+#
+
+source $TENX_SCRIPTDIR/common/_includes
+
+DOCOPT_SPEC="$(cat <<EOF
+$DOCOPT_PREAMBLE_FASTQS
+
+Options:
+# Genome
+    $DOCOPT_OPTIONS_REFERENCE
+
+# Sample Specification
+    $DOCOPT_OPTIONS_FASTQS
+
+# Martian Runtime
+    $DOCOPT_OPTIONS_MRP_CLUSTER 
+EOF
+)"
+
+function implement_process_options {
+    process_options_fastqs
+    process_options_reference
+}
+
+function implement_generate_sample_defs {
+    generate_sample_defs_fastqs_crg
+}
+
+function implement_generate_mro {
+    cat <<EOF > $mro
+@include "aligner_cs.mro"
+
+call ALIGNER_CS(
+    fastq_mode = $fastq_mode,
+    sample_id = $sample_id,
+    sample_def = $sample_def,
+    reference_path = $reference_path,
+)
+EOF
+}
+
+source $TENX_SCRIPTDIR/../tenkit/bin/common/_subcmd_mrp

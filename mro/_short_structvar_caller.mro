@@ -1,0 +1,167 @@
+#
+# Copyright (c) 2014 10X Genomics, Inc. All rights reserved.
+#
+@include "_short_structvar_caller_stages.mro"
+@include "_cnv_wgs.mro"
+
+pipeline _SHORT_STRUCTVAR_CALLER(
+    in  bam        possorted_bam,
+    in  string     sample_id,
+    in  string     sex,
+    in  string     barcode_whitelist,
+    in  string     reference_path,
+    in  bedpe      gt_variants,
+    in  json       basic_summary,
+    in  json       insert_sizes,
+    in  csv        coverage_csv,
+    in  h5         coverage_details,
+    in  tsv.gz     fragment_phasing,
+    in  float      merge_range_factor,
+    in  int        min_rp_del_len,
+    in  int        min_del_len,
+    in  int        max_sv_len,
+    in  int        min_mapq,
+    in  int        min_reads_to_call,
+    in  int        min_call_qv,
+    in  int        max_bc_coverage,
+    in  float      min_lr,
+    in  int        break_pad,
+    in  int[]      detect_dists,
+    in  float      min_rel_overlap,
+    in  float      min_allelic_frac,
+    in  int        em_iters,
+    in  float      het_read_prob,
+    in  float      del_hmm_trans_prob,
+    in  int        min_kmer_obs,
+    in  json       coverage_results,
+    out bedpe      sv_calls,
+    out vcf.gz     svs,
+    out vcf.gz.tbi svs_index           "index"  "svs.vcf.gz.tbi",
+    out json       summary,
+)
+{
+    call PREPARE_SVCALLING_RANGES2(
+        possorted_bam   = self.possorted_bam,
+        coverage        = self.coverage_details,
+        coverage_csv    = self.coverage_csv,
+        reference_path  = self.reference_path,
+        min_region_len  = self.min_del_len,
+        region_pad      = -500,
+        sex             = self.sex,
+        max_bc_coverage = self.max_bc_coverage,
+    )
+
+    call GET_READPAIR_LOCI2(
+        possorted_bam      = self.possorted_bam,
+        barcode_whitelist  = self.barcode_whitelist,
+        basic_summary      = self.basic_summary,
+        min_mapq           = self.min_mapq,
+        insert_sizes       = self.insert_sizes,
+        merge_range_factor = self.merge_range_factor,
+        min_reads_to_call  = self.min_reads_to_call,
+        min_lr_to_call     = 0,
+        min_sv_len         = 700,
+        max_sv_len         = self.max_sv_len,
+        ranges             = PREPARE_SVCALLING_RANGES2.ranges,
+    )
+
+    call GET_DEL_CANDIDATES(
+        possorted_bam     = self.possorted_bam,
+        sex               = self.sex,
+        reference_path    = self.reference_path,
+        barcode_whitelist = self.barcode_whitelist,
+        min_mapq          = self.min_mapq,
+        min_del_len       = self.min_rp_del_len,
+        max_del_len       = 4000,
+        min_bad_region    = 30,
+        transition_prob   = self.del_hmm_trans_prob,
+        het_read_prob     = 0.9,
+    )
+
+    call GET_SMALL_CANDIDATES(
+        possorted_bam     = self.possorted_bam,
+        sex               = self.sex,
+        reference_path    = self.reference_path,
+        barcode_whitelist = self.barcode_whitelist,
+        min_mapq          = self.min_mapq,
+        min_del_len       = 35,
+        max_del_len       = 2500,
+        min_bad_region    = 30,
+        transition_prob   = self.del_hmm_trans_prob,
+        het_read_prob     = self.het_read_prob,
+    )
+
+    call ASSEMBLE_PHASED_DELETIONS(
+        possorted_bam  = self.possorted_bam,
+        reference_path = self.reference_path,
+        candidates     = GET_SMALL_CANDIDATES.del_candidates,
+        padding_abs    = 250,
+        padding_fract  = 0.33,
+        min_kmer_obs   = self.min_kmer_obs,
+        coverage_json  = self.coverage_results,
+    )
+
+    call GET_JOINT_READ_LR(
+        possorted_bam    = self.possorted_bam,
+        basic_summary    = self.basic_summary,
+        sv_calls         = GET_READPAIR_LOCI2.sv_calls,
+        sv_calls2        = GET_DEL_CANDIDATES.del_candidates,
+        fragment_phasing = self.fragment_phasing,
+        insert_sizes     = self.insert_sizes,
+        min_mapq         = self.min_mapq,
+        break_pad        = self.break_pad,
+        min_sv_len       = self.min_rp_del_len,
+        min_lr           = self.min_lr,
+        min_qv           = self.min_call_qv,
+        em_iters         = self.em_iters,
+    )
+
+    call MERGE_SV_CALLS2(
+        sv_variants1     = GET_JOINT_READ_LR.sv_calls,
+        sv_variants2     = null,
+        max_dist         = 0,
+        min_frac_overlap = self.min_rel_overlap,
+        min_bc_overlap   = null,
+        merge_dist       = true,
+    )
+
+    call MERGE_SIMPLE(
+        calls1 = ASSEMBLE_PHASED_DELETIONS.sv_calls,
+        calls2 = MERGE_SV_CALLS2.sv_variants,
+        calls3 = null,
+    )
+
+    call ANALYZE_SV_CALLS2(
+        sample_id            = self.sample_id,
+        variants             = MERGE_SIMPLE.merged,
+        keep_filters         = true,
+        gt_variants          = self.gt_variants,
+        call_summary         = null,
+        coverage             = null,
+        min_call_qv_wgs      = 0,
+        min_call_qv_target   = 0,
+        min_read_support     = 0,
+        reference_path       = self.reference_path,
+        sv_blacklist_regions = null,
+        seg_dups             = null,
+        min_dist_from_black  = 0,
+        max_frac_black       = 1,
+        seg_dup_min_dist     = 0,
+        detect_dists         = self.detect_dists,
+        min_rel_overlap      = self.min_rel_overlap,
+        targets              = null,
+        target_dists         = null,
+        min_sv_len           = self.min_del_len,
+        min_allelic_frac     = self.min_allelic_frac,
+        is_germline          = null,
+        blacklist_mode       = "sv",
+        segdup_mode          = "sv",
+    )
+
+    return (
+        sv_calls  = ANALYZE_SV_CALLS2.sv_calls,
+        svs       = ANALYZE_SV_CALLS2.svs,
+        svs_index = ANALYZE_SV_CALLS2.svs_index,
+        summary   = ANALYZE_SV_CALLS2.summary,
+    )
+}

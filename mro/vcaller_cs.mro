@@ -1,0 +1,48 @@
+#
+# Copyright (c) 2014 10X Genomics, Inc. All rights reserved.
+#
+@include "vcaller.mro"
+
+# See phaser.mro for option documentation
+pipeline VCALLER_CS(
+    in  string     fastq_mode,
+    in  string     sample_id,
+    in  map[]      sample_def,
+    in  string     reference_path,
+    in  bed        targets,
+    in  string     vc_mode,
+    in  vcf        vc_ground_truth,
+    in  string     restrict_locus,
+    out csv        summary              "Run summary",
+    out bam        possorted_bam        "BAM barcoded"  "possorted_bam.bam",
+    out bam.bai    possorted_bam_index  "BAM index"     "possorted_bam.bam.bai",
+    out vcf.gz     variants             "VCF"           "variants.vcf.gz",
+    out vcf.gz.tbi variants_index       "VCF index"     "variants.vcf.gz.tbi",
+)
+{
+    call VCALLER(
+        max_coverage            = 100000,
+        fastq_mode              = self.fastq_mode,
+        sample_id               = self.sample_id,
+        sample_def              = self.sample_def,
+        reference_path          = self.reference_path,
+        targets                 = self.targets,
+        cov_regions_of_interest = null,
+        vc_regions_of_interest  = null,
+        restrict_locus          = self.restrict_locus,
+        exclude_non_bc_reads    = false,
+        trim_length             = 7,
+        barcode_whitelist       = "4M-with-alts-february-2016",
+        confident_regions       = null,
+        vc_mode                 = self.vc_mode,
+        vc_ground_truth         = self.vc_ground_truth,
+    )
+
+    return (
+        summary             = VCALLER.summary_cs,
+        possorted_bam       = VCALLER.possorted_bam,
+        possorted_bam_index = VCALLER.possorted_bam_index,
+        variants            = VCALLER.variants,
+        variants_index      = VCALLER.variants_index,
+    )
+}

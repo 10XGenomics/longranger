@@ -1,0 +1,5 @@
+add unit test for the following case:
+	BamFile  string = "/mnt/analysis/marsoc/pipestances/HMVT3CCXX/PHASER_SVCALLER_PD/20486/1014.0.13-0/PHASER_SVCALLER_PD/PHASER_SVCALLER/ATTACH_PHASING/fork0/files/phased_possorted_bam.bam"
+        BamIndex string = BamFile + ".bai"
+	chr10   29712154        29712449
+

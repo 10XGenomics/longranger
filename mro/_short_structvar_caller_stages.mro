@@ -1,0 +1,179 @@
+#
+# Copyright (c) 2015 10X Genomics, Inc. All rights reserved.
+#
+filetype vcf.gz;
+filetype vcf.gz.tbi;
+filetype bam;
+filetype tabix;
+filetype pickle;
+filetype bed;
+filetype bedpe;
+filetype json;
+filetype tsv;
+filetype h5;
+filetype csv;
+filetype tsv.gz;
+
+stage ANALYZE_SV_CALLS2(
+    in  string     sample_id,
+    in  bedpe      variants,
+    in  bedpe      gt_variants,
+    in  json       call_summary,
+    in  json       coverage,
+    in  bool       keep_filters,
+    in  int        min_call_qv_wgs,
+    in  int        min_call_qv_target,
+    in  int        min_read_support,
+    in  string     reference_path,
+    in  bed        sv_blacklist_regions,
+    in  bedpe      seg_dups,
+    in  int        min_dist_from_black,
+    in  float      max_frac_black,
+    in  int        seg_dup_min_dist,
+    in  int[]      detect_dists,
+    in  float      min_rel_overlap,
+    in  bed        targets,
+    in  int[]      target_dists,
+    in  int        min_sv_len,
+    in  float      min_allelic_frac,
+    in  bool       is_germline,
+    in  string     blacklist_mode,
+    in  string     segdup_mode,
+    out json       summary,
+    out tsv        summary_tsv,
+    out bedpe      sv_calls,
+    out bedpe      sv_candidates,
+    out vcf.gz     svs,
+    out vcf.gz.tbi svs_index             "index"  "svs.vcf.gz.tbi",
+    out bedpe      feasible_gt,
+    out tsv        call_tsv,
+    src py         "stages/structvars/analyze_sv_calls",
+) split using (
+    in  int        start_idx,
+    in  int        stop_idx,
+)
+
+stage PREPARE_SVCALLING_RANGES2(
+    in  bam    possorted_bam,
+    in  string reference_path,
+    in  h5     coverage,
+    in  csv    coverage_csv,
+    in  int    min_region_len,
+    in  int    region_pad,
+    in  string sex,
+    in  int    max_bc_coverage,
+    out pickle ranges,
+    src py     "stages/structvars/prepare_svcalling_ranges",
+) split using (
+    in  string chrom,
+    in  int    size,
+)
+
+stage GET_READPAIR_LOCI2(
+    in  bam    possorted_bam,
+    in  string barcode_whitelist,
+    in  json   basic_summary,
+    in  int    min_mapq,
+    in  json   insert_sizes,
+    in  float  merge_range_factor,
+    in  int    min_reads_to_call,
+    in  int    min_lr_to_call,
+    in  int    min_sv_len,
+    in  int    max_sv_len,
+    in  pickle ranges,
+    out bedpe  sv_calls,
+    out json   discordant_read_counts,
+    src py     "stages/structvars/get_readpair_loci",
+) split using (
+    in  string chrom,
+    in  int[]  starts,
+    in  int[]  stops,
+)
+
+stage GET_JOINT_READ_LR(
+    in  bam    possorted_bam,
+    in  json   basic_summary,
+    in  bedpe  sv_calls,
+    in  bedpe  sv_calls2,
+    in  tsv.gz fragment_phasing,
+    in  json   insert_sizes,
+    in  int    min_mapq,
+    in  int    break_pad,
+    in  float  min_lr,
+    in  int    min_qv,
+    in  int    min_sv_len,
+    in  int    em_iters,
+    out bedpe  sv_calls,
+    out bedpe  non_pass_sv_calls,
+    src py     "stages/structvars/get_joint_read_lr",
+) split using (
+    in  int    chunk_start,
+    in  int    chunk_end,
+)
+
+stage MERGE_SIMPLE(
+    in  bedpe calls1,
+    in  bedpe calls2,
+    in  bedpe calls3,
+    out bedpe merged,
+    src py    "stages/structvars/merge_simple",
+)
+
+stage ASSEMBLE_PHASED_DELETIONS(
+    in  bam    possorted_bam,
+    in  string reference_path,
+    in  bedpe  candidates,
+    in  int    padding_abs,
+    in  float  padding_fract,
+    in  int    min_kmer_obs,
+    in  json   coverage_json,
+    out bedpe  sv_calls,
+    src py     "stages/structvars/assemble_phased_deletions",
+) split using (
+    in  bed    chunk_bed,
+)
+
+stage GET_DEL_CANDIDATES(
+    in  bam      possorted_bam,
+    in  string   sex,
+    in  string   reference_path,
+    in  string   barcode_whitelist,
+    in  int      min_mapq,
+    in  int      min_del_len,
+    in  int      max_del_len,
+    in  int      min_bad_region,
+    in  float    transition_prob,
+    in  float    het_read_prob,
+    out bedpe    del_candidates,
+    src py       "stages/structvars/get_del_candidates",
+) split using (
+    in  string[] loci,
+)
+
+stage GET_SMALL_CANDIDATES(
+    in  bam      possorted_bam,
+    in  string   sex,
+    in  string   reference_path,
+    in  string   barcode_whitelist,
+    in  int      min_mapq,
+    in  int      min_del_len,
+    in  int      max_del_len,
+    in  int      min_bad_region,
+    in  float    transition_prob,
+    in  float    het_read_prob,
+    out bedpe    del_candidates,
+    src py       "stages/structvars/get_small_candidates",
+) split using (
+    in  string[] loci,
+)
+
+stage MERGE_SV_CALLS2(
+    in  bedpe sv_variants1,
+    in  bedpe sv_variants2,
+    in  int   max_dist,
+    in  float min_frac_overlap,
+    in  float min_bc_overlap,
+    in  bool  merge_dist        "whether to merge distant calls or not",
+    out bedpe sv_variants,
+    src py    "stages/structvars/merge_sv_calls",
+)

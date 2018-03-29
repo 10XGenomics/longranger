@@ -1,0 +1,10 @@
+x chr1  -  10      400    - -  CHR1 -
+x chr1  -  1000      4000  - -    CHR1-silly -
+x chr2  -  10      400     - - CHR2 -
+x chr3  -  10      400      - -CHR3 -
+x chr3  -  1000      4000   - -   CHR3-silly -
+x chr11 -   10      400     - - CHR4 -
+x chr21 -   10      400     - - CHR5 -
+x chrX  -  10      400      - -CHR6 -
+x chrY  -  10      400      - -CHR7 -
+

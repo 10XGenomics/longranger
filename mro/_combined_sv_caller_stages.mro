@@ -1,0 +1,64 @@
+#
+# Copyright (c) 2015 10X Genomics, Inc. All rights reserved.
+#
+filetype vcf.gz;
+filetype vcf.gz.tbi;
+filetype bam;
+filetype tabix;
+filetype pickle;
+filetype bed;
+filetype bedpe;
+filetype json;
+filetype tsv;
+filetype h5;
+filetype csv;
+filetype tsv.gz;
+
+stage MERGE_SV_CALLS3(
+    in  bedpe sv_variants,
+    in  bedpe cnv_variants,
+    in  int   max_dist,
+    in  json  sv_summary,
+    out bedpe sv_variants,
+    src py    "stages/structvars/merge_sv_calls2",
+)
+
+stage ANALYZE_SV_COMBINED_CALLS(
+    in  string     sample_id,
+    in  bedpe      variants,
+    in  bedpe      gt_variants,
+    in  json       call_summary,
+    in  json       coverage,
+    in  bool       keep_filters,
+    in  int        min_call_qv_wgs,
+    in  int        min_call_qv_target,
+    in  int        min_read_support,
+    in  string     reference_path,
+    in  bed        sv_blacklist_regions,
+    in  bedpe      seg_dups,
+    in  int        min_dist_from_black,
+    in  float      max_frac_black,
+    in  int        seg_dup_min_dist,
+    in  int[]      detect_dists,
+    in  float      min_rel_overlap,
+    in  bed        targets,
+    in  int[]      target_dists,
+    in  int        min_sv_len,
+    in  float      min_allelic_frac,
+    in  bool       is_germline,
+    in  float      max_bc_cov_factor,
+    in  string     blacklist_mode,
+    in  string     segdup_mode,
+    out json       summary,
+    out tsv        summary_tsv,
+    out bedpe      sv_calls,
+    out bedpe      sv_candidates,
+    out vcf.gz     svs,
+    out vcf.gz.tbi svs_index             "index"  "svs.vcf.gz.tbi",
+    out bedpe      feasible_gt,
+    out tsv        call_tsv,
+    src py         "stages/structvars/analyze_sv_calls",
+) split using (
+    in  int        start_idx,
+    in  int        stop_idx,
+)

@@ -1,0 +1,80 @@
+#
+# Copyright (c) 2015 10X Genomics, Inc. All rights reserved.
+#
+filetype bam;
+filetype vcf;
+filetype vcf.gz;
+filetype vcf.gz.tbi;
+filetype filter_params;
+filetype json;
+filetype bed;
+filetype tsv;
+filetype tsv.gz;
+filetype h5;
+filetype csv;
+
+stage CALL_SNPINDELS(
+    in  string vc_precalled,
+    in  string variant_mode                "'freebayes' or 'gatk:/path/to/GenomeAnalysisTK.jar'",
+    in  string restrict_locus,
+    in  bed    targets_file,
+    in  bam    input                       "sorted and indexed bam file",
+    in  string reference_path              "name of the reference reference_path",
+    in  bed    high_coverage_excluded_bed,
+    out vcf    precalled,
+    out vcf                                "output vcf",
+    src py     "stages/snpindels/call_snpindels",
+) split using (
+    in  string locus,
+)
+
+stage POPULATE_INFO_FIELDS(
+    in  vcf      vc_precalled,
+    in  string   variant_mode,
+    in  vcf.gz   haploid_merge       "optional vcf to merge with normal calls",
+    in  vcf      input,
+    in  string[] chunk_locus         "list of chunk loci, only required if supplying haploid_merge",
+    in  string   reference_path,
+    in  bam      bam,
+    in  int      min_mapq_attach_bc,
+    in  int      default_indel_qual,
+    out vcf.gz,
+    src py       "stages/snpindels/populate_info",
+) split using (
+    in  vcf      chunk_input,
+    in  string   chunk_locus,
+)
+
+stage SORT_SNPINDELS(
+    in  vcf    input    "input vcf file",
+    out vcf.gz          "output compressed vcf",
+    src py     "stages/snpindels/sort_snpindels",
+)
+
+stage ANALYZE_SNPINDEL_CALLS(
+    in  string     vc_precalled,
+    in  string     variant_mode                  "'freebayes' or 'gatk:/path/to/GenomeAnalysisTK.jar'",
+    in  bam        bam_file,
+    in  vcf.gz     ground_truth                  "ground truth variants",
+    in  vcf.gz     input                         "called variants",
+    in  vcf.gz     comparison_vcf                "other vcf to compare to... could be used to compare 2 10x runs or a truseq sample",
+    in  h5         coverage,
+    in  bed        targets_file                  "file specifying targets to focus analysis on",
+    in  csv        p1_genes_list                 "file containing list of P1 genes",
+    in  string     reference_path,
+    in  string     restrict_locus,
+    in  map        regions_of_interest,
+    in  int        long_switch_penalty_multiple,
+    in  tsv.gz     fragment_phasing,
+    in  bam        validation_bam,
+    out vcf.gz     varcalls,
+    out vcf.gz.tbi varcalls_index,
+    out h5         variants,
+    out h5         phase_blocks,
+    out csv        gene_stats,
+    out csv        variant_stats,
+    out json       summary                       "results of analysis",
+    src py         "stages/snpindels/analyze_snpindel_calls",
+) split using (
+    in  string     locus,
+)

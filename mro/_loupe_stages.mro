@@ -1,0 +1,35 @@
+#
+# Copyright (c) 2015 10X Genomics, Inc. All rights reserved.
+#
+filetype loupe;
+filetype vcf.gz;
+filetype json;
+filetype bedpe;
+filetype bam;
+filetype tsv;
+filetype tsv.gz;
+filetype bedpe;
+filetype bed;
+
+stage LOUPE_PREPROCESS(
+    in  string reference_path,
+    in  vcf.gz input_vcf,
+    in  bam    sorted_deduplicated_bam,
+    in  bedpe  structvar_data,
+    in  bedpe  shortstructvar_data,
+    in  tsv    bkpt_details,
+    in  json   fragment_histogram,
+    in  json   summarize_output,
+    in  json   single_partition_data,
+    in  json   coverage_data,
+    in  json   phasing_quality_data,
+    in  json   alarms,
+    in  json   length_mass_data,
+    in  bed    targets,
+    in  tsv.gz fragments,
+    in  string sample_desc,
+    in  bool   noloupe,
+    out loupe  output_for_loupe,
+    src py     "stages/loupe",
+) split using (
+)

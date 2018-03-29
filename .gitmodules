@@ -1,0 +1,17 @@
+[submodule "lib/stan/cmdstan"]
+	path = lib/stan/cmdstan
+	url = git@github.com:stan-dev/cmdstan.git
+	ignore = dirty
+[submodule "lib/lariat"]
+	path = lib/lariat
+	url = git@github.com:10XGenomics/lariat.git
+[submodule "lib/go/src/github.com/codegangsta/cli"]
+	path = lib/go/src/github.com/codegangsta/cli
+	url = git@github.com:urfave/cli.git
+[submodule "lib/go/src/code.google.com/vitess"]
+	path = lib/go/src/code.google.com/vitess
+	url = https://github.com/youtube/vitess.git
+	fetchRecurseSubmodules = false
+[submodule "lib/bamtofastq"]
+	path = lib/bamtofastq
+	url = git@github.com:10XGenomics/bamtofastq.git

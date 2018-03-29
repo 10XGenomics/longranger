@@ -1,0 +1,129 @@
+#
+# Copyright (c) 2017 10X Genomics, Inc. All rights reserved.
+#
+@include "_cnv_stages.mro"
+
+pipeline CNV_WGS(
+    in  string   reference_path,
+    in  h5       fragments_h5,
+    in  tsv.gz   fragment_phasing,
+    in  bam      phased_possorted_bam,
+    in  int      bin,
+    in  int[]    nearTargetBin,
+    in  int      mapq,
+    in  int      overlap,
+    in  int      maxUnknownGap,
+    in  int      maxNormalGap,
+    in  int      maxHomoGap,
+    in  float    pvalFlt,
+    in  float    WildCovFlt,
+    in  float    BGImparityPvalFlt,
+    in  float    BGBaseCovFlt,
+    in  float    BGPhaseFracFlt,
+    in  bedpe    wgs_deletions_gt,
+    in  map      stratification,
+    out bed      het_del,
+    out bed      het_del_filtered,
+    out json     summary,
+    out bed      falsePositives,
+    out bed      falseNegatives,
+    out csv      fragments,
+    out txt      stat,
+    out csv      fracPhased,
+    out bedGraph hp1,
+    out bedGraph hp2,
+    out bedGraph hp0,
+    out bedGraph zero_cov_hp1,
+    out bedGraph zero_cov_hp2,
+    out bed      candiate_het_del,
+    out bedGraph anyzero,
+    out bedGraph homo,
+    out txt      covStat,
+)
+{
+    call GENERATE_GROUND_TRUTH(
+        reference_path         = self.reference_path,
+        min_overlap            = 0,
+        wgs_deletions_gt       = self.wgs_deletions_gt,
+        target_regions         = null,
+        low_coverage_blacklist = null,
+        blacklist_map          = null,
+        wgsmode                = true,
+    )
+
+    call GET_COV_BEDGRAPH(
+        bam_infile = self.phased_possorted_bam,
+    )
+
+    call CONVERT_HDF5_TO_CSV(
+        fragments_h5 = self.fragments_h5,
+    )
+
+    call MODIFY_BED_FILE(
+        in_bed        = GET_COV_BEDGRAPH.het_del_regions,
+        bin           = self.bin,
+        nearTargetBin = self.nearTargetBin,
+        addOffTarget  = false,
+    )
+
+    call GET_RPM(
+        fragments            = CONVERT_HDF5_TO_CSV.fragments,
+        fragment_phasing     = self.fragment_phasing,
+        phased_possorted_bam = self.phased_possorted_bam,
+        queryRegions         = MODIFY_BED_FILE.modified,
+        wgsmode              = true,
+        mapq                 = self.mapq,
+        overlap              = self.overlap,
+    )
+
+    call CALL_CNV(
+        wgsmode       = true,
+        rPMFiles      = GET_RPM.rPMFiles,
+        maxUnknownGap = self.maxUnknownGap,
+        maxNormalGap  = self.maxNormalGap,
+        maxHomoGap    = self.maxHomoGap,
+    )
+
+    call FILTER_HET_DEL(
+        het_del           = CALL_CNV.het_del,
+        pvalFlt           = self.pvalFlt,
+        WildCovFlt        = self.WildCovFlt,
+        BGImparityPvalFlt = self.BGImparityPvalFlt,
+        BGBaseCovFlt      = self.BGBaseCovFlt,
+        BGPhaseFracFlt    = self.BGPhaseFracFlt,
+        blacklist_map     = GENERATE_GROUND_TRUTH.blacklist_map,
+        wgsmode           = true,
+    )
+
+    call ANALYZE_CNV(
+        wgsmode                    = true,
+        het_del                    = FILTER_HET_DEL.het_del_filtered,
+        het_del_truth_sensitivity  = GENERATE_GROUND_TRUTH.het_gt_sen,
+        het_del_truth_ppv          = GENERATE_GROUND_TRUTH.het_gt_ppv,
+        het_del_stratification     = self.stratification,
+        blacklist_map              = GENERATE_GROUND_TRUTH.blacklist_map,
+        homo_del                   = null,
+        homo_del_truth_sensitivity = null,
+        homo_del_truth_ppv         = null,
+    )
+
+    return (
+        fragments        = CONVERT_HDF5_TO_CSV.fragments,
+        stat             = GET_RPM.stat,
+        fracPhased       = GET_RPM.fracPhased,
+        het_del          = CALL_CNV.het_del,
+        het_del_filtered = FILTER_HET_DEL.het_del_filtered,
+        summary          = ANALYZE_CNV.summary,
+        falsePositives   = ANALYZE_CNV.het_del_falsePositives,
+        falseNegatives   = ANALYZE_CNV.het_del_falseNegatives,
+        hp1              = GET_COV_BEDGRAPH.hp1,
+        hp2              = GET_COV_BEDGRAPH.hp2,
+        hp0              = GET_COV_BEDGRAPH.hp0,
+        zero_cov_hp1     = GET_COV_BEDGRAPH.zero_cov_hp1,
+        zero_cov_hp2     = GET_COV_BEDGRAPH.zero_cov_hp2,
+        candiate_het_del = GET_COV_BEDGRAPH.het_del_regions,
+        anyzero          = GET_COV_BEDGRAPH.anyzero,
+        homo             = GET_COV_BEDGRAPH.homo,
+        covStat          = GET_RPM.covStat,
+    )
+}

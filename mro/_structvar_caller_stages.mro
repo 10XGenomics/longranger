@@ -1,0 +1,313 @@
+#
+# Copyright (c) 2015 10X Genomics, Inc. All rights reserved.
+#
+filetype vcf.gz;
+filetype vcf.gz.tbi;
+filetype bam;
+filetype tabix;
+filetype pickle;
+filetype bed;
+filetype bedpe;
+filetype json;
+filetype tsv;
+filetype h5;
+filetype csv;
+filetype tsv.gz;
+
+stage COUNT_READS_BCS(
+    in  bam      input,
+    in  string   sex,
+    in  string   reference_path,
+    in  tsv      blacklist,
+    in  h5       barcodes,
+    in  pickle   inv_bc_map,
+    in  bed      targets,
+    in  int      target_extend,
+    in  string   restrict_locus,
+    in  int      window_size,
+    in  int      step,
+    in  int      min_reads,
+    in  int      max_merge_dist,
+    in  int      min_mapq,
+    in  bool     read1_only,
+    in  bool     no_split,
+    in  bool     slide,
+    out pickle[] bc_pos_mats,
+    out pickle   inv_bc_map,
+    out pickle   bc_counts,
+    out pickle   win_counts,
+    out pickle   loci,
+    src py       "stages/structvars/count_reads_bcs",
+) split using (
+    in  string   chrom,
+    in  int[]    starts,
+    in  int[]    stops,
+)
+
+stage DETECT_OVERLAPS(
+    in  bam      possorted_bam,
+    in  json     fragment_histogram,
+    in  h5       fragments,
+    in  pickle[] bc_pos_mats,
+    in  pickle   inv_bc_map,
+    in  pickle   bc_counts,
+    in  pickle   win_counts,
+    in  pickle   loci,
+    in  int      nx,
+    in  int      min_overlap,
+    in  int      min_call_dist,
+    in  int      max_call_dist,
+    in  float    max_logp,
+    in  float    max_bcs_to_call,
+    in  string   test,
+    out pickle   overlap_loci,
+    src py       "stages/structvars/detect_overlaps",
+) split using (
+    in  pickle[] bc_mat_list1,
+    in  pickle[] bc_mat_list2,
+    in  pickle   inv_bc_map,
+    in  pickle   win_counts,
+)
+
+stage CALL_STRUCTVARS(
+    in  bam    possorted_bam,
+    in  pickle overlap_loci,
+    in  bedpe  low_depth_loci,
+    in  bedpe  rp_calls,
+    in  int    sv_min_qv,
+    in  h5     fragments,
+    in  json   fragment_histogram,
+    in  tsv.gz fragment_phasing,
+    in  tsv    barcode_blacklist,
+    in  json   coverage,
+    in  h5     coverage_details,
+    in  bed    targets,
+    in  float  p_ov_mol,
+    in  int    min_mapq,
+    in  int    min_bcs,
+    in  int    max_cand_breaks,
+    in  int    grid_len,
+    out bedpe  sv_variants,
+    src py     "stages/structvars/call_structvars",
+) split using (
+    in  int    start_idx,
+    in  int    stop_idx,
+)
+
+stage CALL_STRUCTVARS_FRAG(
+    in  bam    input               "possorted BAM (doesnt need to be phased)",
+    in  int    min_mapq,
+    in  pickle overlap_loci        "list of loci to consider from DETECT_OVERLAPS",
+    in  int    sv_min_qv,
+    in  int    min_call_dist       "min SV to call (max of this and frag_size_prc-implied will be used)",
+    in  h5     fragments,
+    in  json   fragment_histogram,
+    in  tsv.gz fragment_phasing,
+    in  tsv    barcode_blacklist,
+    in  json   coverage,
+    in  bed    targets,
+    in  float  frag_size_prc       "percentile of fragment size distribution to use for computing min SV to call",
+    in  int    grid_len            "window size for refining barcode overlap regions in the absence of targets",
+    in  int    break_ext           "input candidate loci will be extended by +/-break_ext",
+    in  float  p_ov_mol            "probability of barcode collisions",
+    in  int    min_frag_size,
+    in  int    min_reads_per_frag,
+    out bedpe  sv_variants,
+    out json   summary,
+    src py     "stages/structvars/call_structvars_frag",
+) split using (
+    in  int    start_idx,
+    in  int    stop_idx,
+)
+
+stage ANALYZE_SV_CALLS(
+    in  string     sample_id,
+    in  bedpe      variants,
+    in  bedpe      gt_variants,
+    in  json       call_summary,
+    in  json       coverage,
+    in  bool       keep_filters,
+    in  int        min_call_qv_wgs,
+    in  int        min_call_qv_target,
+    in  int        min_read_support,
+    in  string     reference_path,
+    in  bed        sv_blacklist_regions,
+    in  bedpe      seg_dups,
+    in  int        min_dist_from_black,
+    in  float      max_frac_black,
+    in  int        seg_dup_min_dist,
+    in  int[]      detect_dists,
+    in  float      min_rel_overlap,
+    in  bed        targets,
+    in  int[]      target_dists,
+    in  int        min_sv_len,
+    in  float      min_allelic_frac,
+    in  bool       is_germline,
+    in  float      max_bc_cov_factor,
+    in  string     blacklist_mode,
+    in  string     segdup_mode,
+    out json       summary,
+    out tsv        summary_tsv,
+    out bedpe      sv_calls,
+    out bedpe      sv_candidates,
+    out vcf.gz     svs,
+    out vcf.gz.tbi svs_index             "index"  "svs.vcf.gz.tbi",
+    out bedpe      feasible_gt,
+    out tsv        call_tsv,
+    src py         "stages/structvars/analyze_sv_calls",
+) split using (
+    in  int        start_idx,
+    in  int        stop_idx,
+)
+
+stage ANALYZE_KNOWN_BREAKS_FRAG(
+    in  bam   input,
+    in  bed   targets,
+    in  int   nx,
+    in  int   extend_win,
+    in  bedpe gt_variants,
+    in  h5    fragments,
+    in  json  fragment_histogram,
+    in  h5    barcodes,
+    in  tsv   barcode_blacklist,
+    in  json  coverage,
+    in  float frag_size_prc,
+    out bedpe summary,
+    src py    "stages/structvars/analyze_known_breaks_frag",
+) split using (
+    in  int   start_idx,
+    in  int   stop_idx,
+)
+
+stage MERGE_SV_CALLS(
+    in  bedpe sv_variants1,
+    in  bedpe sv_variants2,
+    in  int   max_dist,
+    in  float min_frac_overlap,
+    in  float min_bc_overlap,
+    in  bool  merge_dist        "whether to merge distant calls or not",
+    out bedpe sv_variants,
+    src py    "stages/structvars/merge_sv_calls",
+)
+
+stage GET_READPAIR_EVIDENCE(
+    in  bam   input,
+    in  bool  best_only,
+    in  bedpe sv_variants,
+    in  int   break_extend,
+    in  int   min_mapq,
+    in  int   min_reads_to_call,
+    in  int   min_lr_to_call,
+    in  float rp_lr_multiplier,
+    in  json  insert_sizes,
+    in  json  basic_summary,
+    out bedpe sv_variants,
+    src py    "stages/structvars/get_readpair_evidence",
+) split using (
+    in  int   start_idx,
+    in  int   stop_idx,
+)
+
+stage GET_HAP_COVERAGE(
+    in  bam      possorted_bam,
+    in  bed      targets,
+    in  h5       phase_set_h5,
+    out h5       hap_coverage,
+    src py       "stages/structvars/get_hap_coverage",
+) split using (
+    in  string[] loci,
+)
+
+stage GET_LOW_DEPTH_LOCI(
+    in  bam      possorted_bam,
+    in  string   reference_path,
+    in  bed      targets,
+    in  h5       hap_coverage,
+    in  int      bin_size,
+    in  int      min_len,
+    out pickle   loci,
+    out tsv      cov_summary,
+    src py       "stages/structvars/get_low_depth_loci",
+) split using (
+    in  string[] loci,
+)
+
+stage PREPARE_SVCALLING_RANGES(
+    in  bam    possorted_bam,
+    in  string reference_path,
+    in  h5     coverage,
+    in  csv    coverage_csv,
+    in  int    min_region_len,
+    in  int    region_pad,
+    in  string sex,
+    in  int    max_bc_coverage,
+    out pickle ranges,
+    src py     "stages/structvars/prepare_svcalling_ranges",
+) split using (
+    in  string chrom,
+    in  int    size,
+)
+
+stage GET_READPAIR_LOCI(
+    in  bam    possorted_bam,
+    in  string barcode_whitelist,
+    in  json   basic_summary,
+    in  int    min_mapq,
+    in  json   insert_sizes,
+    in  float  merge_range_factor,
+    in  int    min_reads_to_call,
+    in  int    min_lr_to_call,
+    in  int    min_sv_len,
+    in  int    max_sv_len,
+    in  pickle ranges,
+    out bedpe  sv_calls,
+    out json   discordant_read_counts,
+    src py     "stages/structvars/get_readpair_loci",
+) split using (
+    in  string chrom,
+    in  int[]  starts,
+    in  int[]  stops,
+)
+
+stage FILTER_PILEUPS(
+    in  bam   possorted_bam,
+    in  bedpe sv_calls,
+    in  h5    hap_coverage,
+    in  float min_rel_depth,
+    in  float max_clipped_frac,
+    out bedpe sv_calls,
+    out bedpe pileups,
+    src py    "stages/structvars/filter_pileups",
+) split using (
+    in  int   start_idx,
+    in  int   stop_idx,
+)
+
+stage FILTER_LOW_MAPQ(
+    in  bam   possorted_bam,
+    in  bedpe sv_calls,
+    in  float max_frac_low_mapq,
+    out bedpe sv_calls,
+    out bedpe pileups,
+    src py    "stages/structvars/filter_low_mapq",
+) split using (
+    in  int   start_idx,
+    in  int   stop_idx,
+)
+
+stage GET_DEL_CANDIDATES2(
+    in  bam      possorted_bam,
+    in  string   sex,
+    in  string   reference_path,
+    in  string   barcode_whitelist,
+    in  int      min_mapq,
+    in  int      min_del_len,
+    in  int      max_del_len,
+    in  int      min_bad_region,
+    in  float    transition_prob,
+    in  float    het_read_prob,
+    out bedpe    del_candidates,
+    src py       "stages/structvars/get_del_candidates",
+) split using (
+    in  string[] loci,
+)

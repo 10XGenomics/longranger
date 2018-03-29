@@ -1,0 +1,29 @@
+#!/usr/bin/env python
+import pysam
+import os.path
+import tenkit.bam
+import argparse
+import tenkit.bio_io as tk_io
+
+parser = argparse.ArgumentParser(description='Print set of BX tags present in reads mapped to the given locus')
+parser.add_argument("locus", help="Locus to extract BX tags from")
+parser.add_argument("bam_file", help="BAM file to index")
+args = parser.parse_args()
+
+if os.path.exists(args.bam_file):
+    bam = pysam.Samfile(args.bam_file)
+    (chrom, start, end) = tk_io.get_locus_info(args.locus)
+
+    bx_set = set()
+    n_reads = 0
+
+    for r in bam.fetch(chrom, start, end):
+        n_reads = n_reads + 1
+        bx = tk_io.get_read_barcode(r)
+        if bx is not None:
+            bx_set.add(bx)
+
+    for bx in bx_set:
+        print bx
+else:
+    print "Could not find BAM file: %s" % args.bam_file

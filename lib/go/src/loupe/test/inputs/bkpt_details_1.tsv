@@ -1,0 +1,4 @@
+#chrom1	start1	end1	chrom2	start2	end2	sv	bkpt_number	phase_set	called_hap	phase_set_start	phase_set_end	sv_bcs	hap1_bcs	hap2_bcs	hap1_ov_bcs	hap2_ov_bcs
+chr1	1000	2000	chr2	1010	9000	A	1	.	.	.	.	1	.	.	.	.	9	9	9
+chr1	1100	2100	chr2	2500	3000	B	1	2	1	9	1	8	7	6	5	4	3	9	9	9	9
+chr4	1000	2000	chr4	2100	3000	D	2	1	2	3	2	4	5	6	7	8	9	9	9	9	9

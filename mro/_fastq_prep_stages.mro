@@ -1,0 +1,40 @@
+#
+# Copyright (c) 2015 10X Genomics, Inc. All rights reserved.
+#
+filetype fastq;
+filetype bam;
+filetype bam.bai;
+filetype bed;
+filetype json;
+filetype fastq.gz;
+filetype txt;
+
+stage SETUP_CHUNKS(
+    in  string   sample_id,
+    in  map[]    sample_def              "list of dictionary specifying input data",
+    in  string   input_mode              "configuration of the input fastqs",
+    in  string   barcode_whitelist,
+    in  map      downsample,
+    in  float    downsample_overage      "request extra reads, set to >1 if downstream stages can finalize the downsampling",
+    out map[]    chunks                  "map has barcode, barcode_reverse_complement, sample_index, read1, read2, gem_group, and read group fields",
+    out string[] read_groups             "list of strings representing read groups",
+    out json     downsample_info,
+    out txt      barcode_whitelist_path,
+    out int      requested_read_pairs,
+    src py       "stages/reads/setup_chunks",
+)
+
+stage TRIM_READS(
+    in  map[]  chunks,
+    in  string barcode_whitelist,
+    in  int    max_read_num,
+    in  int    read1_trim_length  "this is the trim length",
+    in  int    read2_trim_length,
+    out map[]  chunks,
+    out fastq  placeholder,
+    out json   bc_counts,
+    out json   lot_info,
+    src py     "stages/reads/trim_reads",
+) split using (
+    in  map    chunk,
+)

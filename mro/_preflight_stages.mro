@@ -1,0 +1,76 @@
+#
+# Copyright (c) 2015 10X Genomics, Inc. All rights reserved.
+#
+filetype bed;
+filetype bedpe;
+filetype vcf;
+
+stage PHASER_SVCALLER_PREFLIGHT(
+    in  string sample_id,
+    in  map[]  sample_def,
+    in  string sex,
+    in  bed    targets,
+    in  bed    target_blacklist,
+    in  string restrict_locus,
+    in  string vc_precalled,
+    in  string vc_mode,
+    in  string reference_path,
+    in  vcf    vc_ground_truth,
+    in  int    sv_min_qv,
+    in  bedpe  sv_ground_truth,
+    in  bool   check_executables,
+    src py     "stages/preflight/phaser_svcaller",
+)
+
+stage PHASER_SVCALLER_PREFLIGHT_LOCAL(
+    in  string sample_id,
+    in  map[]  sample_def,
+    in  string sex,
+    in  bed    targets,
+    in  bed    target_blacklist,
+    in  string restrict_locus,
+    in  string vc_precalled,
+    in  string vc_mode,
+    in  string reference_path,
+    in  vcf    vc_ground_truth,
+    in  int    sv_min_qv,
+    in  bedpe  sv_ground_truth,
+    in  bool   check_executables,
+    src py     "stages/preflight/phaser_svcaller",
+)
+
+stage ALIGNER_PREFLIGHT(
+    in  string sample_id,
+    in  map[]  sample_def,
+    in  bed    targets,
+    in  string reference_path,
+    in  bool   check_executables,
+    src py     "stages/preflight/aligner",
+)
+
+stage ALIGNER_PREFLIGHT_LOCAL(
+    in  string sample_id,
+    in  map[]  sample_def,
+    in  bed    targets,
+    in  string reference_path,
+    in  bool   check_executables,
+    src py     "stages/preflight/aligner",
+)
+
+stage BASIC_PREFLIGHT(
+    in  string sample_id,
+    in  string read_group,
+    in  string output_format,
+    in  map[]  sample_def,
+    in  bool   check_executables,
+    src py     "stages/preflight/basic",
+)
+
+stage BASIC_PREFLIGHT_LOCAL(
+    in  string sample_id,
+    in  string read_group,
+    in  string output_format,
+    in  map[]  sample_def,
+    in  bool   check_executables,
+    src py     "stages/preflight/basic",
+)

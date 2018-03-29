@@ -1,0 +1,23 @@
+package main
+
+import (
+	"commonFunc"
+	"fmt"
+	"os"
+	"strconv"
+)
+
+func main() {
+	maxCnt, err := strconv.Atoi(os.Args[1])
+	commonFunc.CheckErr(err)
+	amp, err2 := strconv.ParseFloat(os.Args[2], 64)
+	commonFunc.CheckErr(err2)
+	bins := GetBins(maxCnt, amp)
+	for i, k := range bins {
+		fmt.Println(i, k)
+	}
+
+	//for i := 0; i < 100; i++ {
+	//	fmt.Println(i, InvHarmonic(float64(i)))
+	//}
+}

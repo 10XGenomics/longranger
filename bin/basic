@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2016 10x Genomics, Inc. All rights reserved.
+#
+# Run BASIC_CS with mrp.
+#
+
+source $TENX_SCRIPTDIR/common/_includes
+
+DOCOPT_SPEC="$(cat <<EOF
+$DOCOPT_PREAMBLE_FASTQS
+
+Options:
+# Output Files
+    --bam               Output barcoded reads as unaligned BAM instead of FASTQ.
+    --readgroup=TEXT    RG data to be inserted into BAM. Optional.
+
+# Sample Specification
+    $DOCOPT_OPTIONS_FASTQS
+
+# Martian Runtime
+    $DOCOPT_OPTIONS_MRP_CLUSTER
+EOF
+)"
+
+function implement_process_options {
+    process_options_fastqs
+
+    # --bam
+    output_format=\"fastq\"
+    if [ "$bam" == "true" ]; then
+        output_format=\"bam\"
+    fi
+
+    # --readgroup
+    if [ -n "$readgroup" ]; then
+        read_group=\"$readgroup\"
+    else
+        read_group=\"None\"
+    fi
+}
+
+function implement_generate_sample_defs {
+    generate_sample_defs_fastqs_crg
+}
+
+function implement_generate_mro {
+    cat <<EOF > $mro
+@include "basic_cs.mro"
+
+call BASIC_CS(
+    fastq_mode = $fastq_mode,
+    sample_id = $sample_id,
+    sample_def = $sample_def,
+    output_format = $output_format,
+    read_group = $read_group,
+)
+EOF
+}
+
+source $TENX_SCRIPTDIR/../tenkit/bin/common/_subcmd_mrp

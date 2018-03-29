@@ -1,0 +1,124 @@
+#
+# Copyright (c) 2015 10X Genomics, Inc. All rights reserved.
+#
+filetype bed;
+filetype bam;
+filetype json;
+filetype h5;
+filetype script;
+filetype txt;
+filetype png;
+filetype csv;
+filetype tsv;
+filetype pickle;
+
+stage REPORT_BASIC(
+    in  bam    input,
+    in  bam    input_pos,
+    in  bed    targets_file,
+    in  string barcode_whitelist,
+    in  json   lot_info,
+    out json   summary,
+    out h5     barcode_counts,
+    out h5     barcode_counts_mapped,
+    out json   insert_sizes,
+    out json   target_dists,
+    out json   mapq_counts,
+    out txt    misc_sm,
+    out txt    qual_sms,
+    out json   lot_info,
+    src py     "stages/reporter/report_basic",
+) split using (
+    in  string chunk_start,
+    in  string chunk_end,
+    in  int    n_chunks,
+)
+
+stage REPORT_COVERAGE(
+    in  string   sex,
+    in  bam      input,
+    in  string   reference_path,
+    in  bed      targets_file,
+    in  bed      confident_regions,
+    in  h5       fragments,
+    in  string   restrict_locus,
+    in  int      high_coverage_threshold,
+    in  map      regions_of_interest,
+    out bed      high_coverage_excluded_bed,
+    out json     summary,
+    out string   sex,
+    out csv      coverage_csv,
+    out h5       coverage,
+    out h5       coverage_off_target,
+    out h5       target_coverage,
+    out csv      target_csv,
+    src py       "stages/reporter/report_coverage",
+) split using (
+    in  string[] loci,
+    in  float    subsample_rate,
+)
+
+stage FILTER_BARCODES(
+    in  bam  input,
+    in  h5   fragments,
+    in  h5   barcodes,
+    out tsv  barcode_blacklist,
+    out json filter_barcodes_results,
+    src py   "stages/reporter/filter_barcodes",
+) split using (
+)
+
+stage REPORT_LENGTH_MASS(
+    in  bed    targets_file,
+    in  string reference_path,
+    in  h5     barcodes,
+    in  h5     fragments,
+    in  string barcode_whitelist,
+    out json   summary,
+    out json   inferred_length_distribution,
+    src py     "stages/reporter/report_length_mass",
+) split using (
+)
+
+stage COPY_FRAGMENT_INFO(
+    in  h5   fragments,
+    in  h5   barcodes,
+    in  json fragment_histogram,
+    in  json single_partition_results,
+    in  json barcode_histogram,
+    out h5   fragments,
+    out h5   barcodes,
+    out json fragment_histogram,
+    out json single_partition_results,
+    out json barcode_histogram,
+    src py   "stages/reporter/copy_fragment_info",
+)
+
+stage SUMMARIZE_REPORTS(
+    in  string sample_id,
+    in  string reference_path,
+    in  bed    targets,
+    in  int    trim_length,
+    in  json   duplicate_summary,
+    in  json   basic_results,
+    in  h5     barcode_counts,
+    in  json   filter_barcodes_results,
+    in  json   coverage_results,
+    in  h5     coverage_details,
+    in  json   variant_results,
+    in  json   sv_results,
+    in  int    sv_min_call_qv_wgs,
+    in  int    sv_min_call_qv_target,
+    in  json   short_del_results,
+    in  json   single_partition_results,
+    in  json   length_mass_results,
+    in  bam    bam_file,
+    in  json   lot_info,
+    in  json   downsample_info,
+    out json   analysis_params,
+    out json   summary,
+    out csv    summary_cs,
+    out json   alarms,
+    out txt    alarms_summary,
+    src py     "stages/reporter/summarize_reports",
+)

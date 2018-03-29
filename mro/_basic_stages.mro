@@ -1,0 +1,27 @@
+#
+# Copyright (c) 2015 10X Genomics, Inc. All rights reserved.
+#
+filetype fastq;
+filetype bam;
+filetype bam.bai;
+filetype bed;
+filetype json;
+filetype fastq.gz;
+filetype csv;
+
+stage MAKE_UNALIGNED_OUTPUT(
+    in  string     sample_id,
+    in  string     output_format,
+    in  string[]   read_groups,
+    in  json       bc_counts,
+    in  fastq.gz[] reads,
+    in  int        trim_length,
+    out int        num_pairs,
+    out int        correct_bc_pairs,
+    out fastq.gz   barcoded,
+    out bam        barcoded_unaligned,
+    out csv        basic_stats,
+    src py         "stages/reads/make_unaligned_output",
+) split using (
+    in  fastq.gz   read_chunk,
+)

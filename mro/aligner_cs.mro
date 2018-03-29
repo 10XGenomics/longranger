@@ -1,0 +1,37 @@
+#
+# Copyright (c) 2015 10X Genomics, Inc. All rights reserved.
+#
+@include "aligner.mro"
+
+pipeline ALIGNER_CS(
+    in  string  fastq_mode           "input fastq mode: ILMN_BCL2FASTQ or BCL_PROCESSOR",
+    in  string  sample_id            "user-supplied sample ID",
+    in  map[]   sample_def           "multiplexed sample definition",
+    in  string  reference_path       "path to reference data directory",
+    out csv     summary              "Run summary",
+    out bam     possorted_bam        "BAM barcoded"             "possorted_bam.bam",
+    out bam.bai possorted_bam_index  "BAM index"                "possorted_bam.bam.bai",
+    out h5      barcodes             "Per-barcode data table",
+    out h5      fragments            "Per-molecule data table",
+)
+{
+    call ALIGNER(
+        fastq_mode        = self.fastq_mode,
+        sample_id         = self.sample_id,
+        sample_def        = self.sample_def,
+        reference_path    = self.reference_path,
+        downsample        = null,
+        targets           = null,
+        trim_length       = 7,
+        barcode_whitelist = "4M-with-alts-february-2016",
+        coverage_rois     = null,
+    )
+
+    return (
+        summary             = ALIGNER.summary_cs,
+        possorted_bam       = ALIGNER.possorted_bam,
+        possorted_bam_index = ALIGNER.possorted_bam_index,
+        barcodes            = ALIGNER.barcodes,
+        fragments           = ALIGNER.fragments,
+    )
+}

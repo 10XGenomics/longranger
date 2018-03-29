@@ -1,0 +1,6 @@
+{
+ "cat": "in the hat",
+ "dogs": ["buster", "ralf", "dickens", "godzilla"],
+ "cities": {"San Francisco": 700000, "Marin": 30000, "New York": 200000000}
+}
+

@@ -1,0 +1,129 @@
+#
+# Copyright (c) 2017 10X Genomics, Inc. All rights reserved.
+#
+@include "_terminal_cnv_stages.mro"
+@include "_zoomable_cov_stages.mro"
+
+pipeline _TERMINAL_CNV_CALLER(
+    in  string     sample_id,
+    in  bedpe      gt_variant,
+    in  string     reference_path,
+    in  bed        blacklist,
+    in  float      min_rel_overlap,
+    in  int        min_cnv_len,
+    in  bam        possorted_bam,
+    in  tsv.gz     fragment_phasing,
+    in  h5         fragments,
+    in  h5         coverage,
+    in  csv        cov_hist,
+    in  string     subcommand,
+    in  int        bin_size,
+    in  float      status_change_penalty,
+    in  float      min_prob,
+    in  int        min_dist_from_black,
+    in  float      max_frac_black,
+    in  bool       allow_bin_size_adj,
+    in  int        min_qv,
+    in  int        minimal_cnv_size,
+    out bed        terminal_cnv_bed,
+    out bedpe      terminal_cnv_bedpe,
+    out json       terminal_summary,
+    out tsv        terminal_summary_tsv,
+    out bedpe      terminal_calls,
+    out bedpe      terminal_candidates,
+    out vcf.gz     terminal_cnv,
+    out vcf.gz.tbi terminal_cnv_index     "index"  "svs.vcf.gz.tbi",
+    out bedpe      terminal_feasible_gt,
+    out tsv        terminal_call_tsv,
+    out int        final_bin_size,
+    out bw         hp_read_1,
+    out bw         hp_read_2,
+    out bw         hp_read_0,
+    out bw         hp_read_t,
+    out bw         hp_bc_1,
+    out bw         hp_bc_2,
+    out bw         hp_bc_0,
+    out bw         hp_bc_t,
+)
+{
+    call GET_COV_BEDGRAPH_WITH_ZOOM(
+        possorted_bam    = self.possorted_bam,
+        fragment_phasing = self.fragment_phasing,
+    )
+
+    call PREPARE_TERMINAL_CNV_GT_AND_BINSIZE(
+        gt_variant     = self.gt_variant,
+        min_cnv_len    = self.min_cnv_len,
+        reference_path = self.reference_path,
+    )
+
+    call COMPUTE_COVERAGE_SPIKES(
+        coverage       = self.coverage,
+        cov_hist       = self.cov_hist,
+        bam_infile     = self.possorted_bam,
+        reference_path = self.reference_path,
+    )
+
+    call CALL_HMM_BC_CNV(
+        subcommand            = self.subcommand,
+        possorted_bam         = self.possorted_bam,
+        fragments             = self.fragments,
+        bin_size              = self.bin_size,
+        status_change_penalty = self.status_change_penalty,
+        blacklist             = self.blacklist,
+        min_prob              = self.min_prob,
+        allow_bin_size_adj    = self.allow_bin_size_adj,
+        reference_path        = self.reference_path,
+        minimal_cnv_size      = self.minimal_cnv_size,
+        spikes                = COMPUTE_COVERAGE_SPIKES.spikes,
+    )
+
+    call ANALYZE_TERMINAL_CNV_CALLS(
+        sample_id            = self.sample_id,
+        variants             = CALL_HMM_BC_CNV.bc_large_cnv,
+        gt_variants          = PREPARE_TERMINAL_CNV_GT_AND_BINSIZE.gt_variant_large_cnv,
+        call_summary         = null,
+        coverage             = null,
+        keep_filters         = true,
+        min_call_qv_wgs      = self.min_qv,
+        min_call_qv_target   = self.min_qv,
+        min_read_support     = 0,
+        reference_path       = self.reference_path,
+        sv_blacklist_regions = self.blacklist,
+        seg_dups             = null,
+        min_dist_from_black  = self.min_dist_from_black,
+        max_frac_black       = self.max_frac_black,
+        seg_dup_min_dist     = 0,
+        detect_dists         = [0],
+        min_rel_overlap      = self.min_rel_overlap,
+        targets              = null,
+        target_dists         = null,
+        min_sv_len           = self.min_cnv_len,
+        min_allelic_frac     = null,
+        is_germline          = null,
+        blacklist_mode       = "terminal_cnv",
+        segdup_mode          = "terminal_cnv",
+    )
+
+    return (
+        terminal_cnv_bed     = CALL_HMM_BC_CNV.bc_cnv,
+        terminal_cnv_bedpe   = CALL_HMM_BC_CNV.bc_large_cnv,
+        terminal_summary     = ANALYZE_TERMINAL_CNV_CALLS.summary,
+        terminal_summary_tsv = ANALYZE_TERMINAL_CNV_CALLS.summary_tsv,
+        terminal_calls       = ANALYZE_TERMINAL_CNV_CALLS.sv_calls,
+        terminal_candidates  = ANALYZE_TERMINAL_CNV_CALLS.sv_candidates,
+        terminal_cnv         = ANALYZE_TERMINAL_CNV_CALLS.svs,
+        terminal_cnv_index   = ANALYZE_TERMINAL_CNV_CALLS.svs_index,
+        terminal_feasible_gt = ANALYZE_TERMINAL_CNV_CALLS.feasible_gt,
+        terminal_call_tsv    = ANALYZE_TERMINAL_CNV_CALLS.call_tsv,
+        final_bin_size       = CALL_HMM_BC_CNV.final_bin_size,
+        hp_read_1            = GET_COV_BEDGRAPH_WITH_ZOOM.hp_read_1,
+        hp_read_2            = GET_COV_BEDGRAPH_WITH_ZOOM.hp_read_2,
+        hp_read_0            = GET_COV_BEDGRAPH_WITH_ZOOM.hp_read_0,
+        hp_read_t            = GET_COV_BEDGRAPH_WITH_ZOOM.hp_read_t,
+        hp_bc_1              = GET_COV_BEDGRAPH_WITH_ZOOM.hp_bc_1,
+        hp_bc_2              = GET_COV_BEDGRAPH_WITH_ZOOM.hp_bc_2,
+        hp_bc_0              = GET_COV_BEDGRAPH_WITH_ZOOM.hp_bc_0,
+        hp_bc_t              = GET_COV_BEDGRAPH_WITH_ZOOM.hp_bc_t,
+    )
+}

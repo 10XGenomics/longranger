@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceRoot}/target/debug/pvc",
+            //"program": "${workspaceRoot}/target/debug/deps/pvc-2da643cd81a6890a",
+            //"args": "underflow_test",
+            "args": ["--trace", "call-bed", "-o", "o1",  "/Users/patrick/refdata/genome.fa", "sorted_test_regions.bam", "tp_test_regions.bed", "0"],
+            //"args": ["--debug", "--trace", "call-bed", "-o", "t1", "/Users/patrick/refdata/genome.fa", "test/sorted_test_regions.bam", "test/test_regions.bed" ,"9"],
+            //"args": ["validate", "chr1_187M.bam", "/Users/patrick/refdata/genome.fa", "chr1:187464827-187466726"],
+            //"args": ["validate-bedpe", "pacbio_na12878_test_regions.bam", "/Users/patrick/refdata/genome.fa", "tst.bedpe"],
+            //"args": ["--asm", "validate-bedpe", "../svtool/na12878/na12878-sorted.bam", "/Users/patrick/refdata/genome.fa", "gte.bedpe"],
+            "cwd": "${workspaceRoot}/test",
+            "env": {"RUST_BACKTRACE": "1"}
+        }
+    ]
+}

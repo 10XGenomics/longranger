@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2017 10x Genomics, Inc.  All rights reserved.
+#
+# Wrapper for running MAKE_FASTQS_CS with mrp, with appropriate
+# Long Ranger Chromium settings.
+
+function implement_read_configuration {
+    TENX_BC_READ_TYPE=R1 \
+    TENX_BC_LENGTH=16 \
+    TENX_SI_READ_TYPE=I1 \
+    TENX_BARCODE_WHITELIST="4M-with-alts-february-2016"
+}
+
+source _mkfastq

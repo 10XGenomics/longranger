@@ -1,0 +1,82 @@
+#
+# Copyright (c) 2015 10X Genomics, Inc. All rights reserved.
+#
+@include "_preflight_stages.mro"
+@include "_sort_fastq_by_barcode.mro"
+@include "_basic_stages.mro"
+@include "_aligner_stages.mro"
+@include "_reporter_stages.mro"
+@include "_fastq_prep_stages.mro"
+
+pipeline BASIC(
+    in  string   fastq_mode          "configuration of the input fastqs",
+    in  string   sample_id,
+    in  map[]    sample_def,
+    in  map      downsample,
+    in  string   output_format,
+    in  string   read_group,
+    in  int      trim_length,
+    in  string   barcode_whitelist   "name of barcode whitelist file",
+    out fastq.gz barcoded,
+    out bam      barcoded_unaligned,
+    out csv      summary_cs,
+    out json     barcode_count,
+)
+{
+    call local preflight BASIC_PREFLIGHT_LOCAL(
+        sample_id         = self.sample_id,
+        read_group        = self.read_group,
+        output_format     = self.output_format,
+        sample_def        = self.sample_def,
+        check_executables = false,
+    )
+
+    call preflight BASIC_PREFLIGHT(
+        sample_id         = self.sample_id,
+        read_group        = self.read_group,
+        output_format     = self.output_format,
+        sample_def        = self.sample_def,
+        check_executables = true,
+    )
+
+    call local volatile SETUP_CHUNKS(
+        sample_id          = self.sample_id,
+        downsample         = self.downsample,
+        input_mode         = self.fastq_mode,
+        sample_def         = self.sample_def,
+        barcode_whitelist  = self.barcode_whitelist,
+        downsample_overage = 1,
+    )
+
+    call volatile TRIM_READS(
+        barcode_whitelist = self.barcode_whitelist,
+        chunks            = SETUP_CHUNKS.chunks,
+        max_read_num      = 5000000,
+        read1_trim_length = 0,
+        read2_trim_length = 0,
+    )
+
+    call _SORT_FASTQ_BY_BARCODE(
+        barcode_counts              = TRIM_READS.bc_counts,
+        bc_confidence_threshold     = 0.975,
+        chunk                       = TRIM_READS.chunks,
+        barcode_whitelist           = self.barcode_whitelist,
+        max_expected_barcode_errors = 1,
+    )
+
+    call MAKE_UNALIGNED_OUTPUT(
+        sample_id     = self.sample_id,
+        output_format = self.output_format,
+        read_groups   = SETUP_CHUNKS.read_groups,
+        reads         = _SORT_FASTQ_BY_BARCODE.reads,
+        bc_counts     = TRIM_READS.bc_counts,
+        trim_length   = self.trim_length,
+    )
+
+    return (
+        barcoded           = MAKE_UNALIGNED_OUTPUT.barcoded,
+        barcoded_unaligned = MAKE_UNALIGNED_OUTPUT.barcoded_unaligned,
+        barcode_count      = TRIM_READS.bc_counts,
+        summary_cs         = MAKE_UNALIGNED_OUTPUT.basic_stats,
+    )
+}

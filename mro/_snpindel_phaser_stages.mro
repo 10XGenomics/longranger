@@ -1,0 +1,80 @@
+#
+# Copyright (c) 2015 10X Genomics, Inc. All rights reserved.
+#
+filetype vcf;
+filetype vcf.gz;
+filetype bam;
+filetype bam.bai;
+filetype tabix;
+filetype pickle;
+filetype bed;
+filetype tsv;
+filetype tsv.gz;
+filetype h5;
+filetype json;
+
+stage SORT_GROUND_TRUTH(
+    in  vcf    input    "input vcf file",
+    out vcf.gz          "output compressed vcf",
+    src py     "stages/snpindels/sort_snpindels",
+)
+
+stage SORT_CALLED_SNPINDELS(
+    in  vcf    input    "input vcf file",
+    out vcf.gz          "output compressed vcf",
+    src py     "stages/snpindels/sort_snpindels",
+)
+
+stage PHASE_SNPINDELS(
+    in  string reference_path,
+    in  string sex,
+    in  string restrict_locus,
+    in  bam    bam_file,
+    in  h5     fragments,
+    in  vcf.gz input,
+    in  float  bc_mix_prob,
+    in  float  min_var_hap_conf,
+    in  string vc_precalled,
+    in  string vc_mode,
+    in  float  min_junction_hap_conf,
+    in  int    hap_block_size,
+    in  int    hap_block_buffer_size,
+    in  int    max_reassign_rounds,
+    in  int    chunk_stitching_overlap,
+    out vcf.gz,
+    out tsv.gz fragment_phasing,
+    out string vc_precalled,
+    src py     "stages/snpindels/phase_snpindels",
+) split using (
+    in  string locus,
+)
+
+stage ATTACH_PHASING(
+    in  bam     input,
+    in  tsv.gz  fragment_phasing,
+    in  h5      fragments,
+    out bam     phased_possorted_bam,
+    out bam.bai phased_possorted_bam_index,
+    out json    summary,
+    out int     total_reads,
+    out int     phased_reads,
+    out int     molecule_tagged_reads,
+    src py      "stages/reads/attach_phasing",
+) split using (
+    in  string  chunk_start,
+    in  string  chunk_end,
+)
+
+stage CALL_HAPLOID_SNPINDELS(
+    in  bam      input,
+    in  string   precalled,
+    in  string   mode,
+    in  vcf.gz   putative_variants,
+    in  string   reference_path,
+    out vcf      precalled,
+    out string[] chunk_locus,
+    out vcf,
+    src py       "stages/snpindels/call_haploid_snpindels",
+) split using (
+    in  string   locus,
+)

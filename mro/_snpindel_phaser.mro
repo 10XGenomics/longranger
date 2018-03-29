@@ -1,0 +1,137 @@
+#
+# Copyright (c) 2014 10X Genomics, Inc. All rights reserved.
+#
+@include "_snpindel_caller.mro"
+@include "_snpindel_phaser_stages.mro"
+
+pipeline _SNPINDEL_PHASER(
+    in  string     sex                         "sex of sample",
+    in  string     reference_path,
+    in  string     restrict_locus              "locus to restrict phasing to",
+    in  bam        input                       "duplicate-marked, sorted aligned bam file",
+    in  h5         fragments                   "fragments h5 file",
+    in  vcf        ground_truth                "phased variants for evaluation",
+    in  vcf.gz     comparison_vcf,
+    in  bam        validation_bam              "BAM file from orthogonal technology to validate variants against",
+    in  bed        targets                     "file specifying targets to focus analysis on",
+    in  map        vc_regions_of_interest,
+    in  float      bc_mix_prob,
+    in  float      min_var_hap_conf,
+    in  float      min_junction_hap_conf,
+    in  int        hap_block_size,
+    in  int        hap_block_buffer_size,
+    in  int        max_reassign_rounds,
+    in  string     vc_precalled,
+    in  string     mode                        "'freebayes' or 'gatk'",
+    in  h5         coverage,
+    in  bed        high_coverage_excluded_bed,
+    in  int        min_mapq_attach_bc,
+    in  int        chunk_stitching_overlap     "size of overlap between chunks, for stitching purposes",
+    in  csv        p1_genes_list,
+    out vcf.gz     phased_variants,
+    out vcf.gz.tbi phased_variants_index,
+    out tsv.gz     fragment_phasing,
+    out h5         phase_blocks,
+    out h5         variants_h5,
+    out csv        gene_stats,
+    out json       results                     "results file",
+    out json       summary,
+    out int        total_reads,
+    out int        phased_reads,
+    out int        molecule_tagged_reads,
+    out bam        phased_possorted_bam,
+    out bam.bai    phased_possorted_bam_index,
+)
+{
+    call volatile SORT_GROUND_TRUTH(
+        input = self.ground_truth,
+    )
+
+    call _SNPINDEL_CALLER(
+        vc_precalled               = self.vc_precalled,
+        high_coverage_excluded_bed = self.high_coverage_excluded_bed,
+        mode                       = self.mode,
+        restrict_locus             = self.restrict_locus,
+        input                      = self.input,
+        reference_path             = self.reference_path,
+        min_mapq_attach_bc         = self.min_mapq_attach_bc,
+    )
+
+    call PHASE_SNPINDELS(
+        reference_path          = self.reference_path,
+        sex                     = self.sex,
+        restrict_locus          = self.restrict_locus,
+        bam_file                = self.input,
+        fragments               = self.fragments,
+        input                   = _SNPINDEL_CALLER.variants,
+        bc_mix_prob             = self.bc_mix_prob,
+        min_var_hap_conf        = self.min_var_hap_conf,
+        vc_precalled            = self.vc_precalled,
+        vc_mode                 = self.mode,
+        min_junction_hap_conf   = self.min_junction_hap_conf,
+        hap_block_size          = self.hap_block_size,
+        hap_block_buffer_size   = self.hap_block_buffer_size,
+        max_reassign_rounds     = self.max_reassign_rounds,
+        chunk_stitching_overlap = self.chunk_stitching_overlap,
+    )
+
+    call ATTACH_PHASING(
+        input            = self.input,
+        fragment_phasing = PHASE_SNPINDELS.fragment_phasing,
+        fragments        = self.fragments,
+    )
+
+    call CALL_HAPLOID_SNPINDELS(
+        precalled         = self.vc_precalled,
+        mode              = self.mode,
+        putative_variants = PHASE_SNPINDELS,
+        input             = ATTACH_PHASING.phased_possorted_bam,
+        reference_path    = self.reference_path,
+    )
+
+    call POPULATE_INFO_FIELDS(
+        vc_precalled       = CALL_HAPLOID_SNPINDELS.precalled,
+        variant_mode       = self.mode,
+        haploid_merge      = PHASE_SNPINDELS,
+        chunk_locus        = CALL_HAPLOID_SNPINDELS.chunk_locus,
+        input              = CALL_HAPLOID_SNPINDELS,
+        reference_path     = self.reference_path,
+        bam                = ATTACH_PHASING.phased_possorted_bam,
+        min_mapq_attach_bc = 30,
+        default_indel_qual = 45,
+    )
+
+    call ANALYZE_SNPINDEL_CALLS(
+        vc_precalled                 = PHASE_SNPINDELS.vc_precalled,
+        variant_mode                 = self.mode,
+        bam_file                     = self.input,
+        ground_truth                 = SORT_GROUND_TRUTH,
+        input                        = POPULATE_INFO_FIELDS,
+        coverage                     = self.coverage,
+        targets_file                 = self.targets,
+        reference_path               = self.reference_path,
+        regions_of_interest          = self.vc_regions_of_interest,
+        comparison_vcf               = self.comparison_vcf,
+        p1_genes_list                = self.p1_genes_list,
+        restrict_locus               = self.restrict_locus,
+        long_switch_penalty_multiple = 5,
+        fragment_phasing             = PHASE_SNPINDELS.fragment_phasing,
+        validation_bam               = self.validation_bam,
+    )
+
+    return (
+        phased_variants            = ANALYZE_SNPINDEL_CALLS.varcalls,
+        phased_variants_index      = ANALYZE_SNPINDEL_CALLS.varcalls_index,
+        results                    = ANALYZE_SNPINDEL_CALLS.summary,
+        phase_blocks               = ANALYZE_SNPINDEL_CALLS.phase_blocks,
+        variants_h5                = ANALYZE_SNPINDEL_CALLS.variants,
+        gene_stats                 = ANALYZE_SNPINDEL_CALLS.gene_stats,
+        fragment_phasing           = PHASE_SNPINDELS.fragment_phasing,
+        phased_possorted_bam       = ATTACH_PHASING.phased_possorted_bam,
+        phased_possorted_bam_index = ATTACH_PHASING.phased_possorted_bam_index,
+        summary                    = ATTACH_PHASING.summary,
+        phased_reads               = ATTACH_PHASING.phased_reads,
+        total_reads                = ATTACH_PHASING.total_reads,
+        molecule_tagged_reads      = ATTACH_PHASING.molecule_tagged_reads,
+    )
+}

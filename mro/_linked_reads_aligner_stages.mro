@@ -1,0 +1,64 @@
+#
+# Copyright (c) 2015 10X Genomics, Inc. All rights reserved.
+#
+filetype fastq.gz;
+filetype fasth.gz;
+filetype bam;
+filetype bam.bai;
+filetype json;
+filetype bed;
+filetype h5;
+filetype rsd;
+
+stage BARCODE_AWARE_ALIGNER(
+    in  fasth.gz[] reads,
+    in  string     reference_path,
+    in  string     sample_id,
+    in  bool       exclude_non_bc_reads,
+    in  string[]   read_groups,
+    in  int        trim_length,
+    out bam[]      bc_sorted_bam,
+    out json       position_chunks,
+    src py         "stages/reads/barcode_aware_aligner",
+) split using (
+    in  fastq.gz   barcode_reads,
+)
+
+stage MERGE_BC_BAM(
+    in  bam[]  bc_sorted_bams,
+    out bam    bc_sorted_bam,
+    src py     "stages/reads/merge_bc_bam",
+) split using (
+    in  string dummy,
+)
+
+stage MERGE_POS_BAM(
+    in  json     position_chunks,
+    in  string   reference_path,
+    in  string   barcode_whitelist,
+    in  rsd      barcode_count,
+    in  bed      targets_file,
+    in  int      bc_max_error_allowed,
+    in  float    bc_pseudo_count,
+    in  bool     bc_use_mapping,
+    in  int      bc_mapq,
+    in  bool     bc_allow_indel,
+    in  bool     frag_no_merging,
+    in  int      frag_mapq,
+    in  float    frag_pval,
+    in  int      frag_freq,
+    in  int      frag_min_num_reads_off_target,
+    out bam      pos_sorted_bam,
+    out bam.bai  pos_sorted_bam_index,
+    out json     single_partition,
+    out json     fragment_size,
+    out h5       fragments,
+    out h5       barcodes,
+    out json     barcode_histogram,
+    out json     summary,
+    src py       "stages/reads/merge_pos_bam",
+) split using (
+    in  string[] position_chunk,
+    in  string   tid,
+    in  bool     unmapped_chunk,
+)

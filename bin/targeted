@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2016 10x Genomics, Inc. All rights reserved.
+#
+# Run PHASER_SVCALLER_EXOME_CS with mrp.
+#
+
+source $TENX_SCRIPTDIR/common/_includes
+
+DOCOPT_SPEC="$(cat <<EOF
+$DOCOPT_PREAMBLE_FASTQS
+
+Options:
+# Genome
+    $DOCOPT_OPTIONS_REFERENCE
+
+# Sample Specification
+    $DOCOPT_OPTIONS_SAMPLE_INFO
+
+    $DOCOPT_OPTIONS_FASTQS
+
+    $DOCOPT_OPTIONS_TARGETED
+
+# Variant Calling
+    $DOCOPT_OPTIONS_VARIANT_CALLING
+
+# Other
+    $DOCOPT_OPTIONS_OTHER
+
+# Martian Runtime
+    $DOCOPT_OPTIONS_MRP_CLUSTER 
+EOF
+)"
+
+function implement_process_options {
+    process_options_fastqs
+    process_options_reference
+    process_options_longranger
+
+    # --targets
+    if [ -n "$targets" ]; then
+        targets=\"$(abspath $targets)\"
+        has_targets=true
+    else
+        error "--targets is required for the targeted pipeline."
+    fi
+
+    # --cnvfilter
+    if [ -n "$cnvfilter" ]; then
+        cnvfilter=\"$(abspath $cnvfilter)\"
+    else
+        cnvfilter=null
+    fi
+}
+
+function implement_generate_sample_defs {
+    generate_sample_defs_fastqs_crg
+}
+
+function implement_generate_mro {
+    cat <<EOF > $mro
+@include "phaser_svcaller_exome_cs.mro"
+
+call PHASER_SVCALLER_EXOME_CS(
+    fastq_mode = $fastq_mode,
+    sample_id = $sample_id,
+    sample_def = $sample_def,
+    sample_desc = $sample_desc,
+    reference_path = $reference_path,
+    sex = $sex,
+    targets = $targets,
+    vc_precalled = $vc_precalled,
+    vc_mode = $vc_mode,
+    vc_ground_truth = null,
+    restrict_locus = null,
+    noloupe = $noloupe,
+    is_germline = $is_germline,
+    cnvfilter = $cnvfilter,
+    downsample = $downsample,
+)
+EOF
+}
+
+source $TENX_SCRIPTDIR/../tenkit/bin/common/_subcmd_mrp

@@ -1,0 +1,95 @@
+#
+# Copyright (c) 2017 10X Genomics, Inc. All rights reserved.
+#
+filetype bam;
+filetype json;
+filetype bed;
+filetype bedpe;
+filetype txt;
+filetype csv;
+filetype tsv.gz;
+filetype h5;
+# "a future format holder for a zoomable coverage format"
+filetype zoom;
+filetype tsv;
+filetype bedGraph;
+filetype vcf.gz;
+filetype vcf.gz.tbi;
+
+stage CALL_HMM_BC_CNV(
+    in  string subcommand,
+    in  bam    possorted_bam,
+    in  h5     fragments,
+    in  int    bin_size,
+    in  float  status_change_penalty,
+    in  bed    blacklist,
+    in  float  min_prob,
+    in  bool   allow_bin_size_adj,
+    in  string reference_path,
+    in  int    minimal_cnv_size,
+    in  bed    spikes,
+    out bed    bc_cnv,
+    out bedpe  bc_large_cnv,
+    out int    final_bin_size,
+    src py     "stages/structvars/call_hmm_bc_cnv",
+) split using (
+    in  int    chunk_id,
+)
+
+stage ANALYZE_TERMINAL_CNV_CALLS(
+    in  string     sample_id,
+    in  bedpe      variants,
+    in  bedpe      gt_variants,
+    in  json       call_summary,
+    in  json       coverage,
+    in  bool       keep_filters,
+    in  int        min_call_qv_wgs,
+    in  int        min_call_qv_target,
+    in  int        min_read_support,
+    in  string     reference_path,
+    in  bed        sv_blacklist_regions,
+    in  bedpe      seg_dups,
+    in  int        min_dist_from_black,
+    in  float      max_frac_black,
+    in  int        seg_dup_min_dist,
+    in  int[]      detect_dists,
+    in  float      min_rel_overlap,
+    in  bed        targets,
+    in  int[]      target_dists,
+    in  int        min_sv_len,
+    in  float      min_allelic_frac,
+    in  bool       is_germline,
+    in  string     blacklist_mode,
+    in  string     segdup_mode,
+    out json       summary,
+    out tsv        summary_tsv,
+    out bedpe      sv_calls,
+    out bedpe      sv_candidates,
+    out vcf.gz     svs,
+    out vcf.gz.tbi svs_index             "index"  "svs.vcf.gz.tbi",
+    out bedpe      feasible_gt,
+    out tsv        call_tsv,
+    src py         "stages/structvars/analyze_sv_calls",
+) split using (
+    in  int        start_idx,
+    in  int        stop_idx,
+)
+
+stage PREPARE_TERMINAL_CNV_GT_AND_BINSIZE(
+    in  bedpe  gt_variant,
+    in  int    min_cnv_len,
+    in  string reference_path,
+    out bedpe  gt_variant_large_cnv,
+    src py     "stages/structvars/prepare_terminal_cnv_gt_and_binsize",
+)
+
+stage COMPUTE_COVERAGE_SPIKES(
+    in  h5     coverage,
+    in  csv    cov_hist,
+    in  bam    bam_infile,
+    in  string reference_path,
+    out bed    spikes,
+    src py     "stages/structvars/compute_coverage_spikes",
+) split using (
+    in  string locus,
+)

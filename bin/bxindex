@@ -1,0 +1,21 @@
+#!/usr/bin/env python
+import os.path
+import tenkit.bam
+import argparse
+
+# Generate an index of the virtual offsets of each BX group
+# for a BX-sorted BAM file.
+def bx_index_bam(bam_fn):
+    index = tenkit.bam.BamBCIndex(bam_fn)
+    index.save_index()
+    print "Wrote bx index to %s.bxi" % bam_fn
+
+
+parser = argparse.ArgumentParser(description='Generate at BX index file (.bxi) for a BX-sorted BAM file')
+parser.add_argument("bam_file", help="BAM file to index")
+args = parser.parse_args()
+
+if os.path.exists(args.bam_file):
+    bx_index_bam(args.bam_file)
+else:
+    print "Could not find BAM file: %s" % args.bam_file

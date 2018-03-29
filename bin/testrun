@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2016 10x Genomics, Inc. All rights reserved.
+#
+# Run VCALLER_CS on test data with mrp.
+#
+
+source $TENX_SCRIPTDIR/common/_includes
+
+# Overwrite standard footer
+read -d '' DOCOPT_OPTIONS_FOOTER <<EOF
+    -h --help           Show this message.
+    --version           Show version.
+EOF
+
+DOCOPT_SPEC="$(cat <<EOF
+Exercises a minimal pipeline on a tiny dataset to confirm software package was
+installed correctly. Can also be used to verify you have a working GATK installation.
+
+Usage:
+    $TENX_SUBCMD --id=ID [--vcmode=v] [options]
+    $TENX_SUBCMD -h | --help | --version
+
+Arguments:
+    id      A unique run id, used to name output folder [a-zA-Z0-9_-]+.
+
+Options:
+# Martian Runtime
+    $DOCOPT_OPTIONS_MRP_CLUSTER
+    --vcmode=MODE       Variant calling mode: 'freebayes'
+                            or 'gatk:/path/to/GenomeAnalysisTK.jar'. Optional
+EOF
+)"
+
+function implement_process_options {
+    echo "Running Long Ranger in test mode..."
+    echo
+
+    # --vcmode
+    if [ -n "$vcmode" ]; then
+        vc_mode=\"$vcmode\"
+    else
+        vc_mode=\"freebayes\"
+    fi
+
+    # This refers to the tiny-ref and tiny-fastq module versions,
+    # and is independent of the Long Ranger version.  The test modules
+    # first shipped with LR 1.2.1.
+    TEST_FASTQ_VERSION="2.0.0"
+    TEST_REF_VERSION="2.1.0"
+    dist_path=$TENX_SCRIPTDIR/../../..
+
+    fastq_mode=\"BCL_PROCESSOR\"
+    
+    tiny_fastq=$dist_path/tiny-fastq/$TEST_FASTQ_VERSION
+    fastqs="$(abspath $tiny_fastq)"
+    lanes=null
+    sample_names=\[\ \"any\"\ \]
+    indices=\[\ \"GTTGCAGC\"\ \]
+    library=\"LongRangerTest\"
+
+    tiny_ref=$dist_path/tiny-ref/$TEST_REF_VERSION
+    reference_path=\"$(abspath $tiny_ref)\"
+    targets=null
+    vc_ground_truth=null
+    restrict_locus=null
+}
+
+function implement_generate_sample_defs {
+    generate_sample_defs_fastqs_crg
+}
+
+function implement_generate_mro {
+    cat <<EOF > $mro
+@include "vcaller_cs.mro"
+
+call VCALLER_CS(
+    fastq_mode = $fastq_mode,
+    sample_id = $sample_id,
+    sample_def = $sample_def,
+    reference_path = $reference_path,
+    targets = $targets,
+    vc_mode = $vc_mode,
+    vc_ground_truth = $vc_ground_truth,
+    restrict_locus = $restrict_locus,
+)
+EOF
+}
+
+source $TENX_SCRIPTDIR/../tenkit/bin/common/_subcmd_mrp
